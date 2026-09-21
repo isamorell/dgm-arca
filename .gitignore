@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Entornos y secretos
+.env
+
+# Pesos, datos, índices y cachés de modelos
+rlm/weights/*
+!rlm/weights/.gitkeep
+rag/corpus/*
+!rag/corpus/.gitkeep
+rag/index/
+outputs/
+runs/
+wandb/
+.cache/
+hf_cache/
+
+# Resultados y gráficas grandes
+reports/*.png
+reports/*.csv
+
+# LaTeX (el .tex y el .pdf sí se versionan)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,2 @@
+{"task": "What is the current temperature in Madrid, and what would it be in Fahrenheit?", "required_tools": ["get_weather", "calculator"], "check": {"type": "regex", "value": "°?F|Fahrenheit"}}
+{"task": "Find in the knowledge base which animal can regrow limbs and tell me how many letters its common name has.", "required_tools": ["search_knowledge_base", "calculator"], "check": {"type": "number", "value": 7}}

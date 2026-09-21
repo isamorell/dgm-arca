@@ -1,0 +1,396 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noquoting,es-nolists,es-noshorthands]{babel}
+\usepackage{tgpagella}
+\usepackage{inconsolata}
+\usepackage{microtype}
+\usepackage[a4paper,top=2.2cm,bottom=2.2cm,left=2.4cm,right=2.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{needspace}
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage[most]{tcolorbox}
+\usepackage[colorlinks=true,linkcolor=arcablue,urlcolor=arcablue,citecolor=arcablue]{hyperref}
+
+% ---------------------------------------------------------------- estilo
+\definecolor{arcablue}{HTML}{1F3A63}
+\definecolor{arcagrey}{HTML}{5A6472}
+\definecolor{arcalight}{HTML}{EEF2F7}
+\definecolor{arcarule}{HTML}{C9D3E0}
+
+\titleformat{\section}{\normalfont\large\bfseries\color{arcablue}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing{\section}{0pt}{1.3ex plus .4ex minus .2ex}{0.8ex}
+\titlespacing{\subsection}{0pt}{1.2ex plus .3ex}{0.6ex}
+
+\setlist[itemize]{leftmargin=1.2em,itemsep=0.15ex,topsep=0.4ex,parsep=0pt}
+\setlist[enumerate]{leftmargin=1.5em,itemsep=0.25ex,topsep=0.4ex,parsep=0pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{arcarule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\footnotesize\color{arcagrey}Modelos Generativos Profundos · MIA · ICAI}
+\fancyhead[R]{\footnotesize\color{arcagrey}Práctica: ARCA}
+\fancyfoot[C]{\footnotesize\color{arcagrey}\thepage\ de \pageref{LastPage}}
+
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+\newcommand{\file}[1]{{\small\texttt{\textcolor{arcablue}{#1}}}}
+
+\newtcolorbox{minimos}[1]{
+  enhanced, breakable, colback=arcalight, colframe=arcablue,
+  boxrule=0pt, leftrule=2.5pt, arc=1pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fonttitle=\bfseries\small, title={#1}, coltitle=arcablue,
+  attach boxed title to top left={xshift=8pt,yshift=-2pt},
+  boxed title style={colback=arcalight,boxrule=0pt,arc=0pt}
+}
+
+\newtcolorbox{nota}{
+  enhanced, breakable, colback=white, colframe=arcarule,
+  boxrule=0.6pt, arc=1pt, left=8pt, right=8pt, top=5pt, bottom=5pt
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55ex}
+
+% ---------------------------------------------------------------- documento
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries\color{arcablue} Práctica ARCA}\\[0.6ex]
+  {\large Agente con Razonamiento, Conocimiento y Acción}\\[1.2ex]
+  {\small Modelos Generativos Profundos · Máster en Inteligencia Artificial · ICAI · Curso 2026-2027}\\[0.8ex]
+  {\small Repositorio: \url{https://github.com/kendrickcetina/dgm-arca}}
+\end{center}
+
+\vspace{0.6ex}
+{\color{arcarule}\hrule height 0.8pt}
+\vspace{1.2ex}
+
+\section{Qué vais a construir}
+
+Durante el curso hemos visto cómo un modelo de lenguaje aprende a razonar, cómo se le enseña
+a usar herramientas, cómo se le conecta a una base de conocimiento y cómo todo eso se junta
+en un agente que actúa en bucle. En esta práctica lo construís vosotros, de principio a fin,
+\textbf{sobre un tema que elegís vosotros}.
+
+La llamamos ARCA porque cada letra es una de las piezas: \textbf{R}azonamiento,
+\textbf{C}onocimiento, \textbf{A}cción, y el \textbf{A}gente que las une.
+
+El tema es libre. Un asistente para preparar unas oposiciones, un agente que lee la normativa
+de un ayuntamiento, un tutor de matemáticas, un copiloto fiscal para autónomos, un entrenador
+de programación competitiva. Lo que queráis, con una condición: que resuelva un problema a
+alguien de verdad, aunque ese alguien seáis vosotros. Si al terminar podéis enseñar el
+repositorio en una entrevista de trabajo, habréis hecho bien el trabajo.
+
+Sabemos que vais a programar con ayuda de agentes de código, y no os lo vamos a prohibir.
+Precisamente por eso lo que puntúa no es escribir código, sino \textbf{decidir qué construir,
+saber si funciona y explicar por qué}. Un agente de código os escribe un bucle GRPO en dos
+minutos; lo que no puede hacer es elegir la tarea verificable de vuestro dominio, diseñar el
+verificador, construir el corpus ni interpretar por qué la recompensa se estanca.
+
+\begin{nota}
+\textbf{Tres condiciones que el tema debe cumplir.} (1) Alguna tarea con \textbf{respuesta
+comprobable automáticamente}: un número, una fecha, un código que pasa tests, una etiqueta.
+Sin verificador no hay recompensa y sin recompensa no hay refuerzo. (2) \textbf{Herramientas
+con sentido} en ese dominio: algo que consultar, algo que calcular, algo que hacer.
+(3) \textbf{Documentación real} que podáis recopilar. Sin corpus no hay RAG.
+\end{nota}
+
+\section{Equipos, ritmo y forma de trabajar}
+
+\textbf{Equipos de tres personas.} Repositorio compartido, un solo entregable por equipo, y
+en la defensa oral preguntamos a cualquiera de los tres sobre cualquier parte del código.
+
+La práctica se construye \textbf{por capas, y se prueba desde el primer día}. No esperéis a
+tenerlo todo: cada fase termina en un endpoint que funciona por sí solo, así que podéis
+levantar la API con la fase 1 hecha y las otras tres devolviendo «pendiente».
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}l l l X@{}}
+\toprule
+\textbf{Fase} & \textbf{Carpeta} & \textbf{Endpoint} & \textbf{Cuándo} \\
+\midrule
+1. Razonamiento   & \file{rlm/}      & \code{/reasoning}  & Empezamos el lunes 21 de septiembre \\
+2. Herramientas   & \file{tool\_use/}& \code{/tools}      & A continuación \\
+3. Conocimiento   & \file{rag/}      & \code{/rag}        & A continuación \\
+4. Agente         & \file{agent/}    & \code{/agent}      & Cierra el proyecto \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+El orden no es casual: primero el modelo aprende a pensar, luego le damos manos, luego memoria
+externa, y al final lo ponemos a trabajar solo usando todo lo anterior. En la fase 4
+reutilizaréis el modelo de la fase 1, las herramientas de la fase 2 y el retriever de la
+fase 3. Pensad en el conjunto desde el principio.
+
+Las fechas exactas de cada entrega las fijamos en clase. Cada README de carpeta tiene el
+detalle completo; este documento es el resumen.
+
+\section{Fase 1: Razonamiento (\file{rlm/})}
+
+Convertir un modelo de lenguaje en un modelo que piensa: que genere su razonamiento entre
+\code{<think>} y \code{</think>} y después la respuesta entre \code{<answer>} y
+\code{</answer>}. Reproducís, a pequeña escala y sobre vuestro dominio, el camino de
+DeepSeek-R1: arranque en frío con SFT y después refuerzo con recompensas verificables.
+
+\begin{minimos}{Mínimos de la fase 1}
+\begin{enumerate}
+  \item \textbf{Dataset verificable propio} (cientos de problemas) y un \textbf{verificador
+  determinista} en \file{verifier.py}, con tests de sus casos límite.
+  \item \textbf{Destilación}: generar trazas con un modelo profesor, filtrarlas con el
+  verificador y quedarse con las correctas. Reportad la tasa de aceptación.
+  \item \textbf{SFT} con LoRA sobre las trazas verificadas.
+  \item \textbf{GRPO} con al menos tres recompensas: formato, exactitud y una
+  \textbf{propia de vuestro dominio} que tendréis que justificar.
+  \item \textbf{Un paso de GRPO implementado a mano} (ventajas, ratio de políticas, recorte,
+  KL) con sus tests en verde.
+  \item \textbf{Evaluación}: pass@1 en test para modelo base, tras SFT y tras GRPO; curvas de
+  recompensa y de longitud; análisis de cinco fallos concretos.
+\end{enumerate}
+\end{minimos}
+
+\textbf{Ficheros.} Ya hechos: \file{rewards.py} (recompensas de formato y exactitud, con
+tests), \file{data.py} (prompt de sistema de R1-Zero y carga de datos),
+\file{generate\_problems.py} (generador de problemas de ejemplo, ejecutable),
+\file{inference.py} (detrás del endpoint). Vuestros: \file{verifier.py}, \file{distill.py},
+\file{train\_sft.py}, \file{train\_grpo.py}, \file{grpo\_step.py}, \file{evaluate.py}.
+
+\textbf{¿De dónde salen cientos de problemas? No de anotarlos a mano.} Las trazas de
+razonamiento las genera el modelo profesor y las filtra vuestro verificador. Y los pares
+(enunciado, respuesta) se consiguen con un generador programático, minando datos
+estructurados, o con benchmarks públicos del dominio. Está todo en
+\file{docs/datasets.md}, con tamaños de referencia y los errores típicos.
+
+\textbf{Antes de empezar}, corred el entrenamiento de prueba: \code{uv run arca-smoke}. Es
+GRPO de verdad en miniatura sobre GSM8K, con las mismas recompensas que usaréis. En diez
+minutos veréis la recompensa de formato subir. Detalles en \file{smoke/README.md} y
+\file{docs/dgx.md}.
+
+\section{Fase 2: Herramientas (\file{tool\_use/})}
+
+Un modelo solo produce texto: no puede consultar una API ni ejecutar código. Tool use es
+dárselo. El modelo genera una llamada en un formato reconocible, la aplicación la detecta, la
+ejecuta y le devuelve el resultado. Los cinco pasos que vimos en clase, implementados a mano.
+
+\begin{minimos}{Mínimos de la fase 2}
+\begin{enumerate}
+  \item \textbf{Tres herramientas reales} de vuestro dominio: una que consulte una API HTTP
+  externa de verdad, una que calcule o ejecute, y una que \textbf{actúe} con efecto
+  observable (escribir un fichero, crear un evento, enviar a un webhook de pruebas).
+  \item \textbf{Definiciones como JSON Schema} generadas desde Pydantic, con los argumentos
+  validados antes de ejecutar; un error de validación vuelve al modelo como observación.
+  \item \textbf{El flujo de cinco pasos escrito por vosotros}, sin frameworks de agentes, con
+  soporte para llamadas encadenadas (multi-step) y varias llamadas en una generación
+  (paralelas).
+  \item \textbf{Banco de pruebas de treinta casos} con la herramienta y los argumentos
+  esperados, incluyendo casos que \textbf{no} necesitan herramienta. Métricas: precisión de
+  selección y de argumentos. Comparad el modelo con y sin herramientas.
+\end{enumerate}
+\end{minimos}
+
+\textbf{Ficheros.} Ya hechos: \file{registry.py} (convierte funciones tipadas en definiciones
+y valida), \file{parser.py} (detecta \code{<tool\_call>}), \file{tools.py} (dos herramientas
+de ejemplo), \file{evaluate.py} (métricas). Vuestros: vuestras herramientas en
+\file{tools.py}, \file{executor.py} y el banco en \file{bench/}.
+
+\textbf{En esta fase no se usa \code{smolagents}.} Queremos ver vuestro bucle. En la fase 4 sí
+lo permitimos, como contraste.
+
+\section{Fase 3: Conocimiento (\file{rag/})}
+
+El conocimiento del modelo se congela en su fecha de corte, y meterle documentos enteros en el
+contexto no funciona. RAG es la alternativa: trocear el corpus, indexarlo, y recuperar solo
+los fragmentos relevantes en el momento de la pregunta.
+
+\begin{minimos}{Mínimos de la fase 3}
+\begin{enumerate}
+  \item \textbf{Corpus real} de vuestro dominio con ingesta reproducible (del orden de
+  decenas de documentos o varios cientos de fragmentos), y su licencia documentada.
+  \item \textbf{Dos estrategias de troceado comparadas} con números: la recursiva y la
+  semántica basada en embeddings de frase.
+  \item \textbf{Embeddings instruction-aware} (Qwen3-Embedding), almacén vectorial,
+  \textbf{BM25} y \textbf{recuperación híbrida} con un peso $\lambda$ ajustable.
+  \item \textbf{Conjunto dorado de cincuenta preguntas} anotadas con el fragmento que las
+  responde, y \textbf{Recall@k y MRR} para los tres retrievers. El $\lambda$ se elige con
+  datos, no a ojo.
+  \item \textbf{Respuestas con citas} a los fragmentos usados, y una comprobación automática
+  de que las citas existen.
+\end{enumerate}
+\end{minimos}
+
+\textbf{Ficheros.} Ya hechos: \file{ingest.py} (lee PDF, Markdown, texto, HTML),
+\file{chunking.py} (troceado recursivo y estadísticas), \file{embed.py} (Qwen3-Embedding con
+instrucción), \file{retriever.py} (BM25), \file{evaluate.py} (Recall@k y MRR),
+\file{generate.py} (prompt aumentado y extracción de citas). Vuestros: el troceado semántico,
+el retriever denso, el híbrido, el corpus en \file{corpus/} y el conjunto dorado en
+\file{gold/}.
+
+El trabajo de verdad de esta fase es el conjunto dorado. Se escribe leyendo el corpus, y es
+lo que os permite decir qué retriever es mejor en vuestro dominio en lugar de suponerlo.
+
+\needspace{16\baselineskip}
+\section{Fase 4: Agente (\file{agent/})}
+
+Todo junto en un bucle: piensa, actúa, observa, y vuelve a pensar hasta responder. Es el
+patrón ReAct, y es donde se juntan las tres fases anteriores.
+
+\begin{minimos}{Mínimos de la fase 4}
+\begin{enumerate}
+  \item \textbf{Bucle ReAct propio} con \code{final\_answer}, límite de pasos, timeouts por
+  herramienta y recuperación de errores. El retriever de la fase 3 entra como la herramienta
+  \code{search\_knowledge\_base}.
+  \item \textbf{Cerebro intercambiable} y comparado: modelo base, vuestro modelo de la
+  fase 1, y un modelo con razonamiento nativo. ¿Ayuda de verdad haber entrenado el modelo?
+  \item \textbf{Memoria} multi-turno que se resume automáticamente al superar un presupuesto
+  de tokens.
+  \item \textbf{Banco de veinte tareas} que requieran encadenar al menos dos herramientas,
+  con tasa de éxito, número medio de pasos y coste en tokens. Comparad vuestro agente JSON
+  con un agente de código.
+  \item \textbf{Traza visible}: cada ejecución devuelve todos los pasos, y una interfaz
+  mínima los muestra.
+\end{enumerate}
+\end{minimos}
+
+\textbf{Ficheros.} Ya hechos: \file{prompts.py} (prompt ReAct), \file{memory.py} (memoria con
+presupuesto), \file{evaluate.py} (métricas por cerebro), \file{ui.py} (visor de trazas).
+Vuestros: \file{react\_agent.py}, la política de memoria y el banco en \file{bench/}.
+
+\section{Todo se prueba desde la API}
+
+\textbf{La corrección se hace llamando a vuestra API.} No leemos vuestros notebooks para saber
+si funciona: lanzamos peticiones. Por eso los contratos de entrada y salida están fijados en
+\file{api/schemas.py}. Podéis añadir campos opcionales a las respuestas, pero no renombrar ni
+quitar los que ya están.
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+\textbf{Endpoint} & \textbf{Envío} & \textbf{Devuelve} \\
+\midrule
+\code{GET /health} & --- & Estado de cada fase: \code{ready}, \code{pending} o \code{error} \\
+\code{POST /reasoning} & \code{question}, \code{expected\_answer?} & \code{thinking},
+  \code{answer}, \code{has\_valid\_format}, veredicto del verificador \\
+\code{POST /tools} & \code{query}, \code{max\_turns?} & \code{answer} y \code{tool\_calls[]}
+  con nombre, argumentos, resultado y latencia \\
+\code{POST /rag} & \code{question}, \code{top\_k?}, \code{retriever?} & \code{answer},
+  \code{chunks[]} con id, fuente y puntuación, y \code{citations[]} \\
+\code{POST /agent} & \code{task}, \code{max\_steps?}, \code{brain?} &
+  \code{final\_answer} y \code{steps[]} con pensamiento, acción y observación \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Cómo funciona mientras desarrolláis.} La API arranca siempre, aunque no hayáis hecho
+nada: una fase sin implementar responde \code{501} con su nombre y un mensaje, y
+\code{/health} os dice qué está listo. Así entregáis por capas y probáis cada fase en cuanto
+la terminéis.
+
+\textbf{Un ejemplo de lo que esperamos ver.}
+
+{\footnotesize
+\begin{verbatim}
+$ curl -s localhost:8000/health
+{"status": "ok", "team": "equipo-07", "domain": "fiscalidad de autonomos",
+ "phases": {"reasoning": {"status": "ready"}, "tools": {"status": "pending"}, ...}}
+
+$ curl -s -X POST localhost:8000/reasoning -H 'Content-Type: application/json' \
+       -d '{"question": "...", "expected_answer": "120"}'
+{"thinking": "Sea C la capacidad del deposito...", "answer": "120",
+ "has_valid_format": true, "tokens_generated": 214,
+ "verifier": {"is_correct": true, "predicted": "120", "expected": "120"}}
+\end{verbatim}
+}
+\vspace{-1.6ex}
+
+\begin{nota}
+\textbf{Para la corrección.} La API tiene que levantar con \code{docker compose up api} en
+una máquina limpia. La exponéis con \href{https://ngrok.com/}{ngrok} (\code{ngrok http 8000})
+y nos pasáis la URL. Antes de pasárnosla, probad los cuatro endpoints desde \code{/docs} y
+comprobad que \code{/health} los marca como \code{ready}. Rellenad también \code{ARCA\_TEAM}
+y \code{ARCA\_DOMAIN} en vuestro \code{.env}: salen en \code{/health} y nos dicen a quién
+estamos corrigiendo. Detalles en \file{api/README.md}.
+\end{nota}
+
+\needspace{14\baselineskip}
+\section{Cómo se evalúa}
+
+Los cuatro criterios se aplican \textbf{a cada fase por separado}, y cada fase pesa lo mismo
+en la nota final.
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}l c X@{}}
+\toprule
+\textbf{Criterio} & \textbf{Peso} & \textbf{Qué miramos} \\
+\midrule
+Implementación correcta & 30\,\% & El endpoint responde y hace lo que dice. Lo comprobamos con
+  un script que lanza peticiones, algunas parecidas a vuestros bancos de pruebas y otras que
+  no habéis visto. \\
+Completitud & 30\,\% & Los mínimos de la fase están hechos. Cada pieza que falte resta. \\
+Interpretación y explicación & 30\,\% & Curvas y métricas explicadas, no solo pintadas.
+  Comparaciones y ablaciones. Análisis de fallos. Cuaderno de experimentos honesto. Y la
+  \textbf{defensa oral}. \\
+Limpieza y calidad & 10\,\% & Sin marcadores pendientes. \code{uv sync} reproduce el entorno,
+  los tests pasan, Docker levanta, README de portfolio, sin secretos en el repositorio. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+La diferencia entre un trabajo correcto y uno excelente está en el tercer criterio. Queremos
+que sepáis por qué vuestra recompensa es como es, qué hace el recorte en GRPO, por qué
+elegisteis ese $\lambda$ y qué pasó cuando le quitasteis el modelo de razonamiento al agente.
+Si el código lo escribió un agente y no sabéis explicarlo, se nota.
+
+Cada fase se entrega con su parte del cuaderno de experimentos
+(\file{docs/EXPERIMENTS\_plantilla.md}), fechado: una entrada que diga «probamos esto, no
+funcionó, creemos que por aquello» vale más que diez que digan «todo bien». La rúbrica
+completa está en \file{docs/rubrica.md}.
+
+\section{La entrega final}
+
+Cuando terminéis las cuatro fases tendréis un sistema completo. Tratadlo como un producto:
+
+\begin{itemize}
+  \item Repositorio público con README de portfolio: qué hace, para quién, una demo, un
+  diagrama, la tabla de métricas de las cuatro fases y cómo levantarlo con una orden.
+  \item El cuaderno de experimentos completo y un informe técnico de diez páginas como máximo
+  (plantilla en \file{docs/informe\_plantilla.md}).
+  \item \textbf{Defensa oral} de diez minutos por equipo: tres de demo en vivo y el resto de
+  preguntas sobre vuestro código y vuestros resultados.
+\end{itemize}
+
+\section{Por dónde empezar}
+
+\begin{enumerate}
+  \item Entrad en \url{https://github.com/kendrickcetina/dgm-arca} y pulsad
+  \textbf{Use this template} para crear el repositorio de vuestro equipo. Si no habéis usado
+  GitHub antes, o no sabéis cómo hacer \code{push} desde la DGX, está paso a paso en
+  \file{docs/github.md}.
+  \item Montad el entorno: \code{uv sync --extra train} y \code{uv run pytest}. Todo en verde
+  antes de tocar nada.
+  \item En la DGX: sesión de code-server desde \url{https://hpc.comillas.edu},
+  \code{source smoke/dgx\_env.sh}, \code{uv run arca-check-gpu} y \code{uv run arca-smoke}.
+  Guía completa, con la GPU de 16\,GB y las sesiones de 24 horas: \file{docs/dgx.md}.
+  \item Elegid tema y escribid la propuesta (\file{docs/00\_propuesta.md}), empezando por la
+  sección de la tarea verificable: si esa sección se escribe sola, tenéis tema. Si no se os
+  ocurre ninguno, en \file{docs/temas\_ejemplo.md} hay trece desarrollados (farmacia, legal,
+  finanzas, desarrollo, social, marketing y ciencia) con su tarea verificable, sus
+  herramientas y su corpus.
+\end{enumerate}
+
+\textbf{Un último consejo.} Empezad por el verificador y por el conjunto dorado, no por el
+modelo: lo que no se puede medir no se puede mejorar. Y haced \code{git push} al terminar cada
+sesión, que la DGX no tiene copias de seguridad.
+
+\end{document}

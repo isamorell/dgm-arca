@@ -1,0 +1,2 @@
+{"question": "Which Mexican salamander can regrow limbs and repair complex tissues?", "relevant_chunk_ids": ["1a2b3c4d5e-0001"], "notes": "ids come from rag/chunking.py: <doc_id>-<index>"}
+{"question": "What is the narwhal's tusk made of?", "relevant_chunk_ids": ["1a2b3c4d5e-0002"]}

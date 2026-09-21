@@ -1,0 +1,56 @@
+# ARCA · servicios para desplegar en cualquier máquina con Docker (con o sin GPU NVIDIA).
+# Dentro de las sesiones de la DGX no hay Docker: allí se usa uv directamente (docs/dgx.md).
+#
+#   docker compose build                    construye la imagen (tarda la primera vez)
+#   docker compose run --rm check-gpu       ¿ve el contenedor la GPU?
+#   docker compose run --rm smoke           entrenamiento GRPO de prueba (10-15 min)
+#   docker compose up api                   API en http://localhost:8000/docs
+#   docker compose run --rm train           shell interactiva con GPU para entrenar
+#
+# Variables (todas opcionales, ver .env.example): CUDA_VISIBLE_DEVICES, HF_CACHE_DIR,
+# ARCA_API_PORT, HF_TOKEN.
+
+x-arca: &arca
+  build: .
+  image: dgm-arca:latest
+  working_dir: /app
+  volumes:
+    # El código se monta en caliente: editas fuera, se ejecuta dentro.
+    - ./:/app
+    # Caché de modelos compartida entre ejecuciones. En la DGX apunta HF_CACHE_DIR a un
+    # disco grande y compartido para no descargar Qwen cien veces.
+    - ${HF_CACHE_DIR:-./hf_cache}:/data/hf_cache
+  environment:
+    - HF_HOME=/data/hf_cache
+    - HF_TOKEN=${HF_TOKEN:-}
+    - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
+    - TOKENIZERS_PARALLELISM=false
+  shm_size: "8gb"
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  api:
+    <<: *arca
+    command: arca-api
+    ports:
+      - "${ARCA_API_PORT:-8000}:8000"
+
+  check-gpu:
+    <<: *arca
+    command: arca-check-gpu
+
+  smoke:
+    <<: *arca
+    command: arca-smoke
+
+  train:
+    <<: *arca
+    command: bash
+    stdin_open: true
+    tty: true

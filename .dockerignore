@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.env
+rlm/weights/*
+!rlm/weights/.gitkeep
+rag/corpus/*
+!rag/corpus/.gitkeep
+rag/index
+hf_cache
+outputs
+runs
+.DS_Store
