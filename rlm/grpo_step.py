@@ -37,8 +37,14 @@ def group_advantages(rewards: torch.Tensor, eps: float = 1e-4, scale: bool = Tru
     Returns:
         Advantages with shape ``(G,)``. A positive advantage means "better than the group".
     """
-    # Tu turno.
-    raise NotImplementedError
+    mean_rewards = rewards.mean(dim=0)
+
+    advantages = rewards - mean_rewards
+    if scale:
+        std_rewards = rewards.std(dim=0).clamp(min=eps)
+        advantages /= std_rewards
+
+    return advantages
 
 
 def policy_ratio(logp_new: torch.Tensor, logp_old: torch.Tensor) -> torch.Tensor:
@@ -46,8 +52,7 @@ def policy_ratio(logp_new: torch.Tensor, logp_old: torch.Tensor) -> torch.Tensor
 
     Both inputs have shape ``(G, T)``. Return a tensor of the same shape.
     """
-    # Tu turno.
-    raise NotImplementedError
+    return torch.exp(logp_new - logp_old)
 
 
 def clipped_objective(
@@ -63,8 +68,10 @@ def clipped_objective(
     Returns:
         Per-token objective, shape ``(G, T)``, *before* masking and averaging.
     """
-    # Tu turno.
-    raise NotImplementedError
+    objective = ratio * advantages[:, None]
+    clipped_objective = ratio.clamp(min=(1 - epsilon), max=(1 + epsilon)) * advantages[:, None]
+    
+    return torch.minimum(objective, clipped_objective)
 
 
 def kl_penalty(logp_new: torch.Tensor, logp_ref: torch.Tensor) -> torch.Tensor:
@@ -72,8 +79,7 @@ def kl_penalty(logp_new: torch.Tensor, logp_ref: torch.Tensor) -> torch.Tensor:
 
     exp(logp_ref - logp_new) - (logp_ref - logp_new) - 1. Always >= 0. Shape ``(G, T)``.
     """
-    # Tu turno.
-    raise NotImplementedError
+    return torch.exp(logp_ref - logp_new) - (logp_ref - logp_new) - 1
 
 
 def grpo_loss(
@@ -93,5 +99,16 @@ def grpo_loss(
     ``mean_advantage``, ``clip_fraction`` (share of tokens where clipping was active) and
     ``kl`` for logging.
     """
-    # Tu turno.
-    raise NotImplementedError
+    advantages = group_advantages(rewards)
+    ratio = policy_ratio(logp_new, logp_old)
+    objectives = clipped_objective(ratio, advantages, epsilon)
+    kl = kl_penalty(logp_new, logp_ref)
+
+    objective = objectives.mean(dim=1).mean(dim=0) - beta * kl * mask
+
+    stats = {
+        "mean_advantage": advantages.mean(dim=0),
+        "clip_fraction": clip_fraction,
+        "kl": kl,
+    }
+    return -objective, stats

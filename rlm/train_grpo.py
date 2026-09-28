@@ -42,6 +42,7 @@ def domain_reward(prompts: Sequence, completions: Sequence, **kwargs) -> list[fl
 
     Until you implement it, it returns 0.0 everywhere so the script still runs.
     """
+    # TODO
     texts = [_completion_text(c) for c in completions]
     return [0.0 for _ in texts]
 
@@ -79,7 +80,7 @@ def train(args: argparse.Namespace) -> None:
         log_completions=True,
         num_completions_to_print=2,
         model_init_kwargs={"dtype": torch.bfloat16 if device == "cuda" else torch.float32},
-        # Tu turno: reward_weights=[1.0, 2.0, 0.5] lets you weight format / accuracy / domain.
+        # TODO: reward_weights=[1.0, 2.0, 0.5] lets you weight format / accuracy / domain.
     )
 
     if args.init_adapter:
