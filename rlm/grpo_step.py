@@ -102,13 +102,30 @@ def grpo_loss(
     advantages = group_advantages(rewards)
     ratio = policy_ratio(logp_new, logp_old)
     objectives = clipped_objective(ratio, advantages, epsilon)
-    kl = kl_penalty(logp_new, logp_ref)
 
-    objective = objectives.mean(dim=1).mean(dim=0) - beta * kl * mask
+    mask = mask.to(objectives.dtype)
+    token_counts = mask.sum(dim=1).clamp(min=1)
+
+    objective = ((objectives * mask).sum(dim=1) / token_counts).mean(dim=0)
+
+    kl_value = torch.zeros_like(objectives)
+
+    if beta > 0:
+        kl_value = kl_penalty(logp_new, logp_ref)
+        kl_mean = (kl_value * mask).sum() / mask.sum().clamp(min=1)
+
+        objective -= beta * kl_mean
+
+    # Fraction of valid tokens where clipping was active
+    clipped_ratio = ratio.clamp(min=(1 - epsilon), max=(1 + epsilon))
+
+    clipped_tokens = (ratio != clipped_ratio).to(mask.dtype)
+
+    clip_fraction = (clipped_tokens * mask).sum() / mask.sum().clamp(min=1)
 
     stats = {
-        "mean_advantage": advantages.mean(dim=0),
-        "clip_fraction": clip_fraction,
-        "kl": kl,
+        "mean_advantage": advantages.mean(dim=0).item(),
+        "clip_fraction": clip_fraction.item(),
+        "kl": ((kl_value * mask).sum() / mask.sum().clamp(min=1)).item(),
     }
     return -objective, stats
