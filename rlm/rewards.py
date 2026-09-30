@@ -68,6 +68,26 @@ def extract_answer(text: str) -> str | None:
         return boxed[-1].strip()
     return None
 
+def _parse_raw_number(raw: str) -> str:
+    """Turn a matched number token into a dot-decimal string, understanding the decimal comma.
+ 
+    ``"243,75"`` -> ``"243.75"`` (Spanish decimal comma) and ``"1,234,567"`` -> ``"1234567"``
+    (thousands separators). A single comma followed by exactly three digits is read as a
+    thousands separator (``"1,250"`` -> ``"1250"``, the GSM8K convention) unless the integer
+    part is 0 (``"0,125"`` -> ``"0.125"``). If the token also has a dot (``"1,234.50"``), the
+    commas are thousands separators.
+    """
+    raw = raw.rstrip(",")
+    if "," not in raw:
+        return raw
+    if "." in raw:  # 1,234.50 -> the comma is a thousands separator, the dot is the decimal
+        return raw.replace(",", "")
+    head, _, tail = raw.rpartition(",")
+    if "," in head:  # 1,234,567 -> thousands separators only
+        return raw.replace(",", "")
+    if len(tail) == 3 and head.lstrip("-") != "0":
+        return raw.replace(",", "")  # 1,250 -> thousands
+    return f"{head}.{tail}"  # 243,75 / 0,125 / 2,5 -> decimal comma
 
 def normalize_number(text: str) -> str | None:
     """Pull the last number out of a piece of text and normalise it.
@@ -79,7 +99,7 @@ def normalize_number(text: str) -> str | None:
     numbers = NUMBER_PATTERN.findall(text.replace("$", ""))
     if not numbers:
         return None
-    raw = numbers[-1].replace(",", "")
+    raw = _parse_raw_number(numbers[-1])
     try:
         value = float(raw)
     except ValueError:
