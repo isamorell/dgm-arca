@@ -26,10 +26,10 @@ import argparse
 from collections.abc import Sequence
 
 from rlm.data import load_domain_dataset, load_gsm8k
-from rlm.rewards import _completion_text, accuracy_reward, format_reward
+from rlm.rewards import _completion_text, accuracy_reward, format_reward, extract_answer, extract_final_unit, normalize_unit
 
 
-def domain_reward(prompts: Sequence, completions: Sequence, **kwargs) -> list[float]:
+def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequence[str], answer_unit_aliases: Sequence[Sequence[str]], **kwargs) -> list[float]:
     """Tu turno: a reward that captures what "good" means in your domain.
 
     Same signature as the other rewards: one float per completion, dataset columns arrive
@@ -43,7 +43,29 @@ def domain_reward(prompts: Sequence, completions: Sequence, **kwargs) -> list[fl
     Until you implement it, it returns 0.0 everywhere so the script still runs.
     """
     # TODO
-    texts = [_completion_text(c) for c in completions]
+    for completion, expected_unit, aliases in zip(completions, answer_unit, answer_unit_aliases, strict=True,):
+        text = _completion_text(completion)
+
+        predicted = extract_answer(text)
+        if predicted is None:
+            rewards.append(0.0)
+            continue
+
+        predicted_unit = extract_final_unit(predicted)
+        if predicted_unit is None:
+            rewards.append(0.0)
+            continue
+
+        expected = normalize_unit(str(expected_unit))
+        accepted_units = {expected} if expected is not None else set()
+
+        for alias in aliases:
+            normalized_alias = normalize_unit(str(alias))
+            if normalized_alias is not None:
+                accepted_units.add(normalized_alias)
+
+        rewards.append(1.0 if predicted_unit in accepted_units else 0.0)
+
     return [0.0 for _ in texts]
 
 
