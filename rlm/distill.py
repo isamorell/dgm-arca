@@ -32,8 +32,9 @@ Design decisions (the ones to defend orally):
   values the Qwen3 model card prescribes for thinking mode; greedy decoding makes the
   model loop and, with ``--samples`` > 1, would give the same trace four times.
 * **Spanish**: the statements are in Spanish, so the teacher is asked to reason in Spanish
-  and traces that are not mostly Spanish are discarded. The student learns to reason in
-  the language of its users.
+  and traces that are not mostly Spanish are discarded. Asking is not enough (Qwen3 keeps
+  thinking in English), so its reasoning is also *started* in Spanish with a short prefill
+  sentence (``THINK_PREFILL``). The student learns to reason in the language of its users.
 * **Canonical format**: Qwen3 writes its reasoning, then ``</think>``, then an answer text.
   We keep only the reasoning and the content of the final ``<answer>`` block, so every
   training example has exactly the structure that the format reward of GRPO will check.
@@ -71,6 +72,13 @@ SPANISH_HINT = (
     "Al final responde con <answer>valor unidad</answer> (por ejemplo "
     "<answer>12,5 mL/h</answer>), con el redondeo que pida el enunciado."
 )
+
+# Qwen3 thinks in English even when the question and the instructions are in Spanish (seen in
+# the pilot: correct answers, English reasoning). The hint above is not enough, so the
+# teacher's reasoning is *started for it* in Spanish: the prompt ends with an open ``<think>``
+# block and this opening sentence, and the model continues from there. The sentence is kept
+# as the first words of the trace, so the student sees it too. ``--no-prefill`` disables it.
+THINK_PREFILL = "<think>\nVale, voy a resolverlo paso a paso. "
 
 # Reasons a generation can be rejected, in the order they are checked.
 REASON_ACCEPTED = "accepted"
@@ -482,12 +490,15 @@ def generate_traces(
     raw_output: str | Path,
     batch_size: int = 2,
     seed: int = 0,
+    prefill: bool = True,
 ) -> int:
     """Generate ``samples`` teacher completions per problem and append them to ``raw_output``.
 
     Problems whose id is already in ``raw_output`` are skipped, which makes the function
-    resumable. Each batch is written to disk right after it finishes. Returns the number of
-    problems generated in this call.
+    resumable. Each batch is written to disk right after it finishes. With ``prefill`` the
+    prompt ends with ``THINK_PREFILL`` (see its comment) and the stored ``raw`` text starts
+    with that prefix, so downstream code sees one complete ``<think>…`` text either way.
+    Returns the number of problems generated in this call.
     """
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -514,6 +525,7 @@ def generate_traces(
                 add_generation_prompt=True,
                 enable_thinking=True,
             )
+            + (THINK_PREFILL if prefill else "")
             for _, problem in group
         ]
         started = time.monotonic()
@@ -533,7 +545,8 @@ def generate_traces(
                         "answer_unit_aliases": problem.get("answer_unit_aliases") or [],
                         "family": problem.get("family"),
                         "level": problem_level(problem),
-                        "raw": text,
+                        "raw": (THINK_PREFILL if prefill else "") + text,
+                        "prefill": prefill,
                         "n_new_tokens": n_tokens,
                         "finished": finished,
                         "teacher": teacher,
@@ -588,6 +601,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--per-family", type=int, default=None, help="pilot: N problems per family")
     parser.add_argument("--limit", type=int, default=None, help="use only the first N problems")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--no-prefill",
+        dest="prefill",
+        action="store_false",
+        help="do not start the teacher's reasoning with a Spanish opening sentence",
+    )
     parser.add_argument("--raw-output", default="outputs/distill/raw.jsonl")
     parser.add_argument("--output", default="rlm/data/sft_traces.jsonl")
     parser.add_argument("--summary", default=None, help="markdown report (default: next to raw)")
@@ -621,6 +640,7 @@ def main() -> None:
             args.raw_output,
             args.batch_size,
             args.seed,
+            args.prefill,
         )
 
     raw_rows = [row for row in read_jsonl(args.raw_output) if row["id"] in wanted_ids]

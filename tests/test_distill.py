@@ -77,6 +77,16 @@ class TestSplitTeacherOutput:
         assert split_teacher_output("<think>\nrazono y razono sin acabar") == (None, None)
 
 
+class TestPrefill:
+    def test_prefilled_reasoning_is_part_of_the_trace(self):
+        from rlm.distill import THINK_PREFILL
+
+        raw = THINK_PREFILL + SPANISH_THINKING + "\n</think>\n\n<answer>95,0 mL</answer>"
+        judged = judge_generation(make_record(raw), VERIFIER)
+        assert judged["verdict"] == REASON_ACCEPTED
+        assert judged["trace"].startswith("<think>\nVale, voy a resolverlo paso a paso.")
+
+
 class TestCanonicalTrace:
     def test_has_the_format_the_reward_checks(self):
         trace = canonical_trace("pienso", "95,0 mL")
