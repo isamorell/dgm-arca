@@ -47,6 +47,7 @@ import argparse
 import json
 import random
 import re
+import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -427,6 +428,7 @@ def _generate_group(model, tokenizer, prompts: list[str], n: int, max_new_tokens
     """
     import torch
 
+    output = None
     try:
         batch = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
         with torch.no_grad():
@@ -438,19 +440,24 @@ def _generate_group(model, tokenizer, prompts: list[str], n: int, max_new_tokens
                 **TEACHER_SAMPLING,
             )
     except torch.cuda.OutOfMemoryError:
+        pass  # handled below, outside the ``except`` block, so the failed tensors can be freed
+
+    if output is None:
         torch.cuda.empty_cache()
         if len(prompts) > 1:
             half = len(prompts) // 2
+            print(f"  out of memory: splitting {len(prompts)} prompts", flush=True)
             return _generate_group(model, tokenizer, prompts[:half], n, max_new_tokens) + (
                 _generate_group(model, tokenizer, prompts[half:], n, max_new_tokens)
             )
         if n > 1:
-            # One prompt, many samples: sample in two chunks, then re-interleave nothing
-            # (a single prompt has no ordering problem).
+            # One prompt, many samples: sample in two chunks (a single prompt has no
+            # ordering problem, so concatenating the chunks is safe).
+            print(f"  out of memory: splitting {n} samples of one prompt", flush=True)
             first = _generate_group(model, tokenizer, prompts, n // 2, max_new_tokens)
             second = _generate_group(model, tokenizer, prompts, n - n // 2, max_new_tokens)
             return first + second
-        raise
+        raise RuntimeError("Out of GPU memory with a single sequence; lower --max-new-tokens")
 
     generated = output[:, batch["input_ids"].shape[1] :]
     eos_ids = model.generation_config.eos_token_id
@@ -496,6 +503,7 @@ def generate_traces(
     model = AutoModelForCausalLM.from_pretrained(teacher, dtype=torch.bfloat16)
     model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
 
+    run_started = time.monotonic()
     for start in range(0, len(pending), batch_size):
         group = pending[start : start + batch_size]
         torch.manual_seed(seed + start)
@@ -508,7 +516,9 @@ def generate_traces(
             )
             for _, problem in group
         ]
+        started = time.monotonic()
         results = _generate_group(model, tokenizer, prompts, samples, max_new_tokens)
+        elapsed = time.monotonic() - started
         rows = []
         for position, (pid, problem) in enumerate(group):
             for sample in range(samples):
@@ -530,7 +540,17 @@ def generate_traces(
                     }
                 )
         append_jsonl(raw_output, rows)
-        print(f"  [{start + len(group)}/{len(pending)}] problems generated", flush=True)
+        done_now = start + len(group)
+        total_time = time.monotonic() - run_started
+        generated_tokens = sum(row["n_new_tokens"] for row in rows)
+        eta_minutes = total_time / done_now * (len(pending) - done_now) / 60
+        print(
+            f"  [{done_now}/{len(pending)}] problems generated | batch {elapsed:.0f}s, "
+            f"{generated_tokens / elapsed:.0f} tok/s (all sequences) | "
+            f"{sum(not row['finished'] for row in rows)}/{len(rows)} cut at the token limit | "
+            f"ETA {eta_minutes:.0f} min",
+            flush=True,
+        )
     return len(pending)
 
 
