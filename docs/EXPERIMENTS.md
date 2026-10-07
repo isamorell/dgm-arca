@@ -173,3 +173,92 @@ familia con 40 problemas cada una en test. Con solo 10 problemas de volumen fina
 resultado de ese subtipo de dilución no es fiable, y lo trataremos con cautela en el análisis.
 
 (vuestras entradas, de la más antigua a la más reciente)
+
+---
+
+### 2026-10-07 · Fase 1 · Destilación: trazas de razonamiento con Qwen3-4B
+
+**Qué queríamos saber.** Cuántas trazas verificadas conseguimos con un teacher de 4B en modo
+thinking sobre nuestros 800 problemas de train, si razona en español, y qué familias o niveles
+le cuestan más (primera medida de lo difícil que es el dominio).
+
+**Qué hicimos.** Teacher `Qwen/Qwen3-4B` en modo thinking, muestreo con los valores de su ficha
+(temperatura 0.6, top-p 0.95, top-k 20, nunca greedy), 4 trazas por problema sobre
+`rlm/data/train.jsonl`, límite de 1200 tokens nuevos. Cada traza se pasa por un único juez
+(`rlm/distill.py`): se reescribe a `<think>…</think><answer>…</answer>`, se verifica con
+`MedicationVerifier` (valor **y** unidad) y se descarta con un motivo único. Para el SFT se
+guardan como máximo las 2 trazas verificadas más cortas de cada problema.
+
+```bash
+uv run python -m rlm.distill --data rlm/data/train.jsonl --samples 4 \
+  --batch-size 2 --max-new-tokens 1200 \
+  --raw-output outputs/distill/raw.jsonl --output rlm/data/sft_traces.jsonl
+```
+
+Antes de la ejecución completa hubo tres decisiones tomadas con pruebas pequeñas:
+
+1. **Idioma.** En una primera prueba (20 generaciones, 512 tokens) las 2 trazas que terminaron
+   eran correctas pero razonaban en inglés, aunque el enunciado y la instrucción estaban en
+   español. Pedirle español en el prompt no bastó, así que se arranca su razonamiento en español
+   (el prompt acaba con `<think>` y la frase "Vale, voy a resolverlo paso a paso."). Esa frase
+   queda como inicio de cada traza. Se descartan las trazas que no son mayoritariamente españolas.
+2. **Piloto** (40 problemas, 160 generaciones, ~30 min): 147 verificadas (91,9 %). La longitud
+   de las generaciones tenía mediana 474 tokens, percentil 95 en 954 y solo el 1 % llegaba al
+   límite de 2048. Por eso se bajó el límite a 1200 en la ejecución completa: acorta los lotes
+   lentos y pierde pocas trazas.
+3. **Dos fallos del juez, vistos en el piloto.** Una respuesta correcta escrita en LaTeX
+   (`20{,}20 mL`) se contaba como mal porque el verificador leía dos números; ahora se limpia
+   antes de verificar. Y el prefill acababa en un espacio que el teacher imitaba, dejando dobles
+   espacios tras cada punto; se quitó el espacio y se normalizan los espacios al construir la traza.
+   De los 8 `wrong_value` del piloto, 7 eran errores de aritmética reales del teacher (por
+   ejemplo 740 mL en 315 min es 140,95 → 141,0, y contestó 141,1 las tres veces): la respuesta de
+   referencia del generador era la correcta.
+
+**Qué pasó.** 3200 generaciones (800 problemas × 4):
+
+- Verificadas: **3005 (93,9 %)**. Problemas con al menos una traza verificada: **788/800**.
+  Longitud media de las trazas aceptadas: 570 tokens. Pasan al SFT **1557 trazas** (máximo 2 por
+  problema).
+- Motivos de rechazo (195 generaciones): `truncated` 164, `wrong_value` 25, `wrong_unit` 6;
+  `no_answer`, `bad_format`, `too_short`, `not_spanish` y `too_long` 0.
+
+| Familia | Generadas | Verificadas | Tasa |
+|---|---|---|---|
+| dilution | 640 | 501 | 78,3 % |
+| dose_day | 640 | 629 | 98,3 % |
+| drops | 640 | 625 | 97,7 % |
+| pump | 640 | 621 | 97,0 % |
+| volume | 640 | 629 | 98,3 % |
+
+| Nivel | Generadas | Verificadas | Tasa |
+|---|---|---|---|
+| 1 | 924 | 902 | 97,6 % |
+| 2 | 996 | 845 | 84,8 % |
+| 3 | 1280 | 1258 | 98,3 % |
+
+Duración de la ejecución completa en el DGX (una partición MIG de 16 GiB): [completar].
+
+**Qué concluimos.**
+
+- El dominio es fácil para el teacher: casi todo lo que se rechaza (164 de 195, el 84 %) es
+  porque no termina de razonar en 1200 tokens, no porque se equivoque (31 respuestas mal de
+  3200, el 1 %). Y las truncadas están casi todas en una familia: `dilution` acumula 137 de las
+  164 (el 21 % de sus 640 generaciones) y solo 2 respuestas mal; en las otras cuatro familias
+  hay entre 3 y 10 truncadas cada una. Es decir, en diluciones (reconstituir, calcular el
+  diluyente o el volumen final) el teacher se alarga mucho, pero cuando termina acierta. Por
+  niveles, el 2 (84,8 %) es el más bajo porque es donde caen esas diluciones.
+- Los errores reales del teacher están sobre todo en `pump` (11 de 25 con `wrong_value`) y
+  `dose_day` (5 de las 6 con `wrong_unit`).
+- Reparto de las 1557 trazas del SFT por familia: dose_day 320, volume 320, drops 319, pump 318,
+  dilution 280. El desequilibrio es pequeño (280 frente a ~320), pero `dilution` es también la
+  familia con más problemas sin traza verificada (12 problemas en total no tienen ninguna). Si
+  el modelo de SFT falla sobre todo en `dilution` en el test, la primera opción es regenerar solo
+  esos problemas con un límite mayor de tokens.
+- Las 6 respuestas con el valor correcto y la unidad equivocada (`wrong_unit`) las habría dado
+  por buenas un verificador solo numérico: justifican comprobar la unidad.
+- Limitaciones: el juez comprueba la respuesta final, no el razonamiento, así que puede haber
+  trazas con respuesta correcta y explicación pobre (hemos visto alguna que describe los pasos
+  sin escribir los números intermedios). Tampoco está medido cuánto acorta las trazas el prefill:
+  sin él, 18 de 20 generaciones no habían terminado en 512 tokens, y con él la mediana del piloto
+  es 474, pero son pruebas con problemas y límites distintos y no se pueden comparar sin más.
+- Siguiente paso: SFT con LoRA sobre `rlm/data/sft_traces.jsonl` (`feat_sft`).
