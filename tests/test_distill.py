@@ -87,6 +87,16 @@ class TestPrefill:
         assert judged["trace"].startswith("<think>\nVale, voy a resolverlo paso a paso.")
 
 
+class TestTidyWhitespace:
+    def test_double_spaces_are_collapsed_but_newlines_stay(self):
+        from rlm.distill import tidy_whitespace
+
+        assert tidy_whitespace("a.  b\t\tc\n\nd  e") == "a. b c\n\nd e"
+
+    def test_trace_has_no_double_spaces(self):
+        assert "  " not in canonical_trace("uno.  dos.   tres", "5 mL")
+
+
 class TestCanonicalTrace:
     def test_has_the_format_the_reward_checks(self):
         trace = canonical_trace("pienso", "95,0 mL")

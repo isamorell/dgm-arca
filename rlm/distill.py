@@ -78,7 +78,7 @@ SPANISH_HINT = (
 # teacher's reasoning is *started for it* in Spanish: the prompt ends with an open ``<think>``
 # block and this opening sentence, and the model continues from there. The sentence is kept
 # as the first words of the trace, so the student sees it too. ``--no-prefill`` disables it.
-THINK_PREFILL = "<think>\nVale, voy a resolverlo paso a paso. "
+THINK_PREFILL = "<think>\nVale, voy a resolverlo paso a paso."
 
 # Reasons a generation can be rejected, in the order they are checked.
 REASON_ACCEPTED = "accepted"
@@ -211,9 +211,20 @@ def last_answer(final_text: str) -> str | None:
     return extract_answer(final_text)
 
 
+def tidy_whitespace(text: str) -> str:
+    """Collapse runs of spaces/tabs into one space (newlines are kept).
+
+    The first pilot showed double spaces after every full stop (the prefill used to end with a
+    space, which the teacher then imitated). They carry no meaning and cost tokens, so they are
+    removed here; it also cleans raw generations that were already saved.
+    """
+    return re.sub(r"[ \t]{2,}", " ", text)
+
+
 def canonical_trace(thinking: str, answer: str) -> str:
     """The exact text the student must learn to write."""
-    return f"<think>\n{thinking.strip()}\n</think>\n<answer>{answer.strip()}</answer>"
+    thinking = tidy_whitespace(thinking.strip())
+    return f"<think>\n{thinking}\n</think>\n<answer>{answer.strip()}</answer>"
 
 
 def spanish_ratio(text: str) -> tuple[float, int]:
