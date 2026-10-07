@@ -211,6 +211,19 @@ def last_answer(final_text: str) -> str | None:
     return extract_answer(final_text)
 
 
+def clean_answer(answer: str) -> str:
+    """Remove LaTeX leftovers from the content of an ``<answer>`` block.
+
+    The teacher sometimes writes math-mode decimals such as ``20{,}20 mL`` or ``\\text{mL}``.
+    ``normalize_number`` would read ``20{,}20`` as the two numbers 20 and 20 and reject a right
+    answer (seen in the pilot), and the student must learn plain text anyway.
+    """
+    answer = answer.replace("{,}", ",").replace("$", "")
+    answer = re.sub(r"\\text\{([^{}]*)\}", r"\1", answer)
+    answer = answer.replace("\\,", " ").replace("\\ ", " ")
+    return re.sub(r"\s+", " ", answer).strip()
+
+
 def tidy_whitespace(text: str) -> str:
     """Collapse runs of spaces/tabs into one space (newlines are kept).
 
@@ -266,6 +279,7 @@ def judge_generation(
     if predicted is None:
         out["verdict"] = REASON_NO_ANSWER
         return out
+    predicted = clean_answer(predicted)
     out["predicted"] = predicted
 
     trace = canonical_trace(thinking, predicted)

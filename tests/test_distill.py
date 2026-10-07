@@ -87,6 +87,25 @@ class TestPrefill:
         assert judged["trace"].startswith("<think>\nVale, voy a resolverlo paso a paso.")
 
 
+class TestCleanAnswer:
+    def test_latex_decimal_comma_is_plain_text(self):
+        from rlm.distill import clean_answer
+
+        assert clean_answer("20{,}20 mL") == "20,20 mL"
+        assert clean_answer("$12{,}5\\,\\text{mL/h}$") == "12,5 mL/h"
+
+    def test_plain_answers_are_untouched(self):
+        from rlm.distill import clean_answer
+
+        assert clean_answer("95,0 mL") == "95,0 mL"
+
+    def test_latex_decimal_comma_no_longer_counts_as_wrong_value(self):
+        raw = teacher_text(final="<answer>95{,}0 mL</answer>")
+        judged = judge_generation(make_record(raw), VERIFIER)
+        assert judged["verdict"] == REASON_ACCEPTED
+        assert "<answer>95,0 mL</answer>" in judged["trace"]
+
+
 class TestTidyWhitespace:
     def test_double_spaces_are_collapsed_but_newlines_stay(self):
         from rlm.distill import tidy_whitespace
