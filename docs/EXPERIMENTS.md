@@ -236,7 +236,7 @@ Antes de la ejecución completa hubo tres decisiones tomadas con pruebas pequeñ
 | 2 | 996 | 845 | 84,8 % |
 | 3 | 1280 | 1258 | 98,3 % |
 
-Duración de la ejecución completa en el DGX (una partición MIG de 16 GiB): [completar].
+Duración de la ejecución completa en el DGX (una partición MIG de 16 GiB): unas 6 h (de 09:11 a 15:10 del 7 de octubre), en una sola ejecución sin reanudar..
 
 **Qué concluimos.**
 
@@ -262,3 +262,57 @@ Duración de la ejecución completa en el DGX (una partición MIG de 16 GiB): [c
   sin él, 18 de 20 generaciones no habían terminado en 512 tokens, y con él la mediana del piloto
   es 474, pero son pruebas con problemas y límites distintos y no se pueden comparar sin más.
 - Siguiente paso: SFT con LoRA sobre `rlm/data/sft_traces.jsonl` (`feat_sft`).
+
+---
+
+### 2026-10-07 · Fase 1 · SFT con LoRA sobre las trazas destiladas
+
+**Qué queríamos saber.** Si con las 1557 trazas verificadas un adaptador LoRA sobre
+Qwen3-0.6B aprende el formato `<think>…</think><answer>…</answer>` y el estilo de razonamiento
+en español, y cuántas épocas conviene.
+
+**Qué hicimos.** Una sola ejecución, con valores de partida estándar y sin barrido:
+
+```bash
+uv run python -m rlm.train_sft --data rlm/data/sft_traces.jsonl --output rlm/weights/sft_lora
+```
+
+- Modelo base `Qwen/Qwen3-0.6B`: es el que entrenará GRPO después y cabe con holgura en la
+  partición MIG de 16 GiB (el profesor, de la misma familia, ya usa su plantilla de chat).
+- LoRA r=16, alpha 32, dropout 0.05, sobre todas las capas lineales. Un arranque en frío enseña
+  un formato y un estilo, no conocimiento nuevo, así que un adaptador pequeño basta.
+- Learning rate 2e-4 con decaimiento coseno y 5 % de calentamiento (rango habitual de LoRA:
+  1e-4 a 3e-4). 3 épocas. Batch efectivo de 16 (2 × 8 pasos de acumulación). bf16 y
+  gradient checkpointing. La pérdida se calcula solo sobre la respuesta del asistente.
+- Datos: el 5 % de los problemas, elegidos por problema y no por traza (cada problema tiene
+  dos trazas y así no hay fugas), se reserva para evaluación: 1479 ejemplos de entrenamiento y
+  78 de evaluación. Longitudes en tokens (prompt + traza) en train: mediana 476, percentil 95 en
+  752, máximo 1177. `max_length` = 1536, así que no se descartó ni cortó ningún ejemplo.
+- Al final de cada época se calcula la pérdida de evaluación y se guarda el adaptador de la
+  mejor época.
+
+**Qué pasó.** 279 pasos en 27 minutos. La pérdida de entrenamiento baja de 0,81 en los primeros
+pasos a ~0,32 al acabar la primera época y a ~0,205 al final (media de la ejecución: 0,286).
+
+| Época | eval_loss | Precisión de token (eval) |
+|---|---|---|
+| 1 | 0,2643 | 0,9111 |
+| 2 | 0,2379 | 0,9164 |
+| 3 | 0,2337 | 0,9198 |
+
+La mejor época por pérdida de evaluación es la 3, que es la que se guarda. Historial completo en
+`rlm/weights/sft_lora/log_history.json`.
+   
+Adaptador publicado en Hugging Face: `raquelfes11/dgm-arca-sft-lora` (modelo base `Qwen/Qwen3-0.6B`).
+
+**Qué concluimos.** La pérdida de evaluación baja en las tres épocas y no hay señal de
+sobreajuste: la diferencia entre entrenamiento (~0,205) y evaluación (0,234) es de unos 0,03. De
+la época 2 a la 3 la mejora es pequeña (0,004) y con solo 78 ejemplos de evaluación (39
+problemas) cae dentro del ruido: lo único que podemos afirmar es que la tercera época no
+empeora, no que sea mejor que la segunda. No hemos probado otros valores de learning rate, rank
+ni número de épocas; los elegidos son valores de partida razonables, no óptimos.
+
+Esta pérdida mide cuánto se parece el modelo al texto del profesor, no si sus respuestas son
+correctas. La comprobación real es el pass@1 sobre `rlm/data/test.jsonl` (y `test_ood.jsonl`)
+con `rlm/evaluate.py`, comparando el modelo base y el SFT. Está pendiente y es el siguiente
+paso, junto con revisar a mano unos cuantos fallos.
