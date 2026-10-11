@@ -35,7 +35,7 @@ VERIFIERS: dict[str, type[Verifier]] = {
     "numeric": NumericVerifier,
     "exact_match": ExactMatchVerifier,
     # Tu turno: register your domain verifier here, e.g. "sql": SQLResultVerifier
-    "medication": MedicationVerifier
+    "medication": MedicationVerifier,
 }
 
 THINK_PATTERN = re.compile(r"<think>(?P<think>.*?)</think>", re.DOTALL)
@@ -83,7 +83,7 @@ class ReasoningModel:
         return cls(
             base_model=base_model,
             adapter_path=adapter,
-            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "medication"),
+            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "numeric"),
         )
 
     def load(self) -> None:
