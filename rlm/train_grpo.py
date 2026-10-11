@@ -24,10 +24,15 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from huggingface_hub import snapshot_download
+import os
+from pathlib import Path
 
 from rlm.data import load_domain_dataset, load_gsm8k
 from rlm.rewards import _completion_text, accuracy_reward, format_reward, extract_answer, extract_final_unit, normalize_unit
 
+from dotenv import load_dotenv
+load_dotenv()
 
 def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequence[str], answer_unit_aliases: Sequence[Sequence[str]], **kwargs) -> list[float]:
     """Tu turno: a reward that captures what "good" means in your domain.
@@ -39,9 +44,8 @@ def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequenc
     * length shaping: penalise thinking that exceeds a budget, or reward concise answers;
     * a units check for physical quantities; a schema check for structured answers;
     * a code-execution reward: run the unit tests of the problem (only in a sandbox!).
-
-    Until you implement it, it returns 0.0 everywhere so the script still runs.
     """
+    rewards: list[float] = []
     for completion, expected_unit, aliases in zip(completions, answer_unit, answer_unit_aliases, strict=True,):
         text = _completion_text(completion)
 
@@ -65,7 +69,7 @@ def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequenc
 
         rewards.append(1.0 if predicted_unit in accepted_units else 0.0)
 
-    return [0.0 for _ in texts]
+    return rewards
 
 
 def train(args: argparse.Namespace) -> None:
@@ -105,6 +109,14 @@ def train(args: argparse.Namespace) -> None:
     )
 
     if args.init_adapter:
+        if not Path(args.init_adapter).exists():
+            sft_repo = os.environ.get("ARCA_SFT_REPO")
+            if not sft_repo:
+                raise SystemExit(
+                    f"{args.init_adapter} no existe y ARCA_SFT_REPO no está definida en el entorno/.env"
+                )
+            snapshot_download(sft_repo, local_dir=args.init_adapter)
+
         # Continue training the SFT adapter: load base + adapter as a trainable PeftModel.
         from peft import PeftModel
         from transformers import AutoModelForCausalLM

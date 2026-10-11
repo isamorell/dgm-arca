@@ -120,8 +120,13 @@ UNIT_ALIASES = {
     "kg": {"kg", "kilogram", "kilograms", "kilogramo", "kilogramos"},
     "min": {"min", "mins", "minute", "minutes", "minuto", "minutos"},
     "h": {"h", "hr", "hrs", "hour", "hours", "hora", "horas"},
-    "drops": {"drop", "drops", "gota", "gotas"},
-    "mL/h": {"ml/h", "ml/hr", "ml/min", "ml/minuto", "ml/hora"},
+    "gotas": {"drop", "drops", "gota", "gotas", "gtt"},
+    "gotas/min": {
+        "gotas/min", "gotas/minuto", "gotas/minutos", "gotaspormin", "gotasporminuto",
+        "gtt/min", "gtt/minuto", "drops/min", "drops/minute", "dropspermin", "dropsperminute",
+    },
+    "mL/h": {"ml/h", "ml/hr", "ml/hora", "ml/horas", "mlporhora"},
+    "mL/min": {"ml/min", "ml/minuto", "ml/minute", "mlpormin", "mlporminuto"},
     "mg/mL": {"mg/ml", "mg/milliliter", "mg/millilitre"},
 }
 
@@ -154,8 +159,11 @@ def extract_final_unit(text: str) -> str | None:
     """
     # Number followed by a unit: "95 mL", "95ml", "5 mg/mL", etc.
     unit_pattern = (
-        r"(?:mg\s*/\s*ml|mg\s*/\s*h|ml\s*/\s*h|ml\s*/\s*min|mL|ml|L|"
-        r"l|mg|mcg|μg|ug|kg|g|min|h|hr|hrs|drops?|gotas?)"
+        r"(?:(?:gotas?|gtt|drops?)\s*(?:/|por|per)\s*min(?:uto|ute)?s?"
+        r"|mg\s*/\s*ml"
+        r"|ml\s*/\s*(?:hr|hora|horas|h)"
+        r"|ml\s*/\s*(?:min|minuto|minute)"
+        r"|mL|ml|L|l|mg|mcg|μg|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
     )
 
     matches = list(

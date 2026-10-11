@@ -314,3 +314,30 @@ Esta pérdida mide cuánto se parece el modelo al texto del profesor, no si sus 
 correctas. La comprobación real es el pass@1 sobre `rlm/data/test.jsonl` (y `test_ood.jsonl`)
 con `rlm/evaluate.py`, comparando el modelo base y el SFT. Está pendiente y es el siguiente
 paso, junto con revisar a mano unos cuantos fallos.
+
+### 2026-10-11 · Fase 1 · GRPO
+
+**Qué queríamos saber.** La pregunta o la hipótesis.
+**Qué hicimos.** Comando exacto, modelo, datos, hiperparámetros que cambian respecto a la
+entrada anterior.
+
+Como entrenamos el modelo partiendo del entrenado con SFT, configuramos en el archivo .env una nueva variable con el link. Para ello, añadimos la siguiente línea al fichero:
+`ARCA_SFT_REPO=raquelfes11/dgm-arca-sft-lora`
+
+Sin kl beta
+{'train_runtime': '6498', 'train_samples_per_second': '0.369', 'train_steps_per_second': '0.046', 'train_loss': '0.03227', 'epoch': '0.375'}
+
+'loss': '0.2363', 'grad_norm': '0.5668', 'learning_rate': '1.667e-08', 'num_tokens': '1.276e+06', 'completions/mean_length': '482', 'completions/min_length': '273', 'completions/max_length': '768', 'completions/clipped_ratio': '0.125', 'completions/mean_terminated_length': '441.1', 'completions/min_terminated_length': '273', 'completions/max_terminated_length': '568', 'rewards/format_reward/mean': '0.875', 'rewards/format_reward/std': '0.3536', 'rewards/accuracy_reward/mean': '0.25', 'rewards/accuracy_reward/std': '0.4629', 'rewards/domain_reward/mean': '0', 'rewards/domain_reward/std': '0', 'reward': '1.125', 'reward_std': '0.6409', 'frac_reward_zero_std': '0', 'entropy': '0.258', 'clip_ratio/low_mean': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/region_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_max': '0', 'step_time': '28.1', 'epoch': '0.375'}
+
+gotas/min
+
+en la grafica curves_grpo_rewards.png se ve q el maximo se alcanza en el epoch 251 => para la siguiente prueba voy a reducirlo hasta entonces. ademas al añadir kl va a aumentar el tiempo del forward asi q viene mejor tener menos epochs
+
+pruebo primero con kl beta = 0.04 pq es la del paper https://arxiv.org/pdf/2402.03300 
+
+el corrector estaba poniendo q el modelo no estaba devolvinendo el domain reward para gotas/min cuando esa es la respuesta esperada => habia un fallo en el codigo => una vez he arreglado el fallo, repito los experimentos con beta 0 y 0.04
+
+**Qué pasó.** Números, curva (enlace a reports/), ejemplos.
+**Qué concluimos.** Y qué hacemos a continuación.
+
+---
