@@ -42,7 +42,6 @@ def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequenc
 
     Until you implement it, it returns 0.0 everywhere so the script still runs.
     """
-    # TODO
     for completion, expected_unit, aliases in zip(completions, answer_unit, answer_unit_aliases, strict=True,):
         text = _completion_text(completion)
 

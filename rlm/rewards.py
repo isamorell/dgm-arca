@@ -109,6 +109,70 @@ def normalize_number(text: str) -> str | None:
     return f"{value:g}"
 
 
+# Unit aliases used by the domain verifier.
+# Keys are canonical units; values are accepted spellings/aliases.
+UNIT_ALIASES = {
+    "mL": {"ml", "milliliter", "milliliters", "millilitre", "millilitres", "cc"},
+    "L": {"l", "liter", "liters", "litre", "litres"},
+    "mg": {"mg", "milligram", "milligrams", "milligramo", "miligramos"},
+    "g": {"g", "gram", "grams", "gramo", "gramos"},
+    "mcg": {"mcg", "μg", "ug", "microgram", "micrograms", "microgramo", "microgramos"},
+    "kg": {"kg", "kilogram", "kilograms", "kilogramo", "kilogramos"},
+    "min": {"min", "mins", "minute", "minutes", "minuto", "minutos"},
+    "h": {"h", "hr", "hrs", "hour", "hours", "hora", "horas"},
+    "drops": {"drop", "drops", "gota", "gotas"},
+    "mL/h": {"ml/h", "ml/hr", "ml/min", "ml/minuto", "ml/hora"},
+    "mg/mL": {"mg/ml", "mg/milliliter", "mg/millilitre"},
+}
+
+
+def normalize_unit(unit: str) -> str | None:
+    """Return the canonical representation of a unit.
+
+    Examples:
+        "ml" -> "mL"
+        "CC" -> "mL"
+        "millilitros" -> "mL"
+        "mg" -> "mg"
+    """
+    cleaned = unit.strip().lower()
+    cleaned = re.sub(r"\s+", "", cleaned)
+
+    for canonical, aliases in UNIT_ALIASES.items():
+        if cleaned == canonical.lower() or cleaned in aliases:
+            return canonical
+
+    return None
+
+
+def extract_final_unit(text: str) -> str | None:
+    """Extract the unit associated with the final numerical answer.
+
+    The function looks near the last number in the extracted answer, rather
+    than searching the whole reasoning trace. This prevents intermediate
+    units from being mistaken for the final answer's unit.
+    """
+    # Number followed by a unit: "95 mL", "95ml", "5 mg/mL", etc.
+    unit_pattern = (
+        r"(?:mg\s*/\s*ml|mg\s*/\s*h|ml\s*/\s*h|ml\s*/\s*min|mL|ml|L|"
+        r"l|mg|mcg|μg|ug|kg|g|min|h|hr|hrs|drops?|gotas?)"
+    )
+
+    matches = list(
+        re.finditer(
+            rf"-?\d[\d,.]*(?:\.\d+)?\s*(?P<unit>{unit_pattern})(?!\w)",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
+
+    if not matches:
+        return None
+
+    raw_unit = matches[-1].group("unit")
+    return normalize_unit(raw_unit)
+
+
 def numbers_match(predicted: str | None, expected: str | None) -> bool:
     """Compare two answers numerically after normalisation."""
     if predicted is None or expected is None:
