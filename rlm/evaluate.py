@@ -37,7 +37,7 @@ def evaluate_model(
     for ex in dataset:
         # The loaders store the question inside ``prompt`` (system + user messages)
         question = ex["prompt"][-1]["content"]
-        raw, n_tokens = rlm.generate(question, max_new_tokens)
+        raw, n_tokens = rlm.generate(question, max_new_tokens, greedy=True)
 
         if isinstance(verifier, MedicationVerifier):
             # Same call as rlm.distill: the unit asked by the problem must be in the answer
@@ -47,10 +47,14 @@ def evaluate_model(
         else:
             result = verifier.verify(raw, ex["answer"])
 
+        unit = ex.get("answer_unit")
         rows.append(
             {
                 "question": question,
-                "expected": ex["answer"],
+                "family": ex.get("family"),
+                "expected": f"{ex['answer']} {unit}" if unit else ex["answer"],
+                "expected_value": ex["answer"],
+                "expected_unit": unit,
                 "raw": raw,
                 "predicted": result.predicted,
                 "is_correct": result.is_correct,

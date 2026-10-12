@@ -174,6 +174,20 @@ resultado de ese subtipo de dilución no es fiable, y lo trataremos con cautela 
 
 ---
 
+### 2026-10-04 · Fase 1 · Definición de la recompensa de dominio
+
+**Qué queríamos saber.** Queríamos definir una recompensa de dominio que fuese importante para nuestra tarea de ayudar a estudiantes de enfermería
+
+**Qué hicimos.** Decidimos que lo mejor era tener una recompensa que penalizase al modelo no utilizar las unidades que pedía el modelo. Para permitirle un poco más de flexibilidad, tenemos en cuenta que las mismas unidades pueden escribirse de distintas formas. Por ejemplo, gotas por minuto se puede abreviar en gotas/min.
+
+También incluimos estas diferentes formas en la extracción de la unidad, que se realiza con cuidado para extraer la unidad que acompaña a la respuesta final y no otra unidad que puede que acompañe a un número distinto.
+
+**Qué pasó.** Generamos diferentes aliases para cada unidad con el fin de poder comparar las diferentes formas en las que referenciamos una misma unidad. Estos los incluimos también en el patrón de regex para extraer las unidades de las respuestas
+
+**Qué concluimos.** Así podremos evaluar la correcta extracción de unidades como la recompensa de dominio.
+
+---
+
 ### 2026-10-07 · Fase 1 · Destilación: trazas de razonamiento con Qwen3-4B
 
 **Qué queríamos saber.** Cuántas trazas verificadas conseguimos con un teacher de 4B en modo
@@ -349,5 +363,102 @@ Los adaptador se encuentran publicados en Hugging Face:
 **Qué concluimos.** Para ambos casos, el modelo logra máximos muy altos en puntos tempranos del entrenamiento.  Esto puede deberse a que el modelo base ya lo hace muy bien. Por ello, vamos a comparar el rendimiento de los tres modelos en el conjunto de test. 
 
 Además, en train parece que funciona mejor no utilizar KL pero esto puede deberse a que KL está actuando como un freno sobre el entrenamiento para que no se separe demasiado del modelo base. Para ver si el modelo está mejorando al incluir KL, vamos a probar el rendimiento en el conjunto de test utilizando el `evaluate.py`.
+
+---
+
+### 2026-10-12 · Fase 1 · Pass@1 de los 3 modelos entrenados y del modelo base
+
+**Qué queríamos saber.** Queremos saber que modelo generaliza mejor en test para poder analizar si grpo mejora el rendimiento del modelo frente al sft, y si utilizar kl con beta 0.04 mejora frente a no usar kl.
+
+**Qué hicimos.** Hemos calculado el Pass@1 de los modelos base, sft y grpo sin KL y con KL beta = 0.04 ejecutando el `evalute.py` con el siguiente comando:
+
+`uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters base=none sft=rlm/weights/sft_lora grpo_sin_kl=rlm/weights/final_rlm_lora_sin_kl grpo=rlm/weights/final_rlm_lora_04`
+
+**Qué pasó.** La ejecución ha tardado más de dos horas ya que la inferencia se ha ido haciendo 1 a 1, sin batching.
+
+Como podemos observar en la imagen siguiente, el modelo base obtiene un 0.0% de pass@1. Esto se debe a que sin el sft, el modelo no ha aprendido el formato y lo rompe añadiendo un bloque `<reasoning process> ... </reasoning process>`. Además, responde sin unidades lo que no cumple con la recompensa de dominio.
+
+Una vez el modelo aprende a razonar, la puntuación sube a 80.5%. Este valor coincide para el sft y el grpo con kl con beta = 0.04. Esto probablemente se deba a que el modelo se encuentra en una zona plana de la que no puede salir debido a la penalización kl. Esto se puede deducir también del análisis anterior en el que se vio que la máxima recompensa obtenida en el entrenamiento fue en el paso 37, indicando que a partir de ese punto el modelo no es capaz de mejorar.
+
+Por último, vemos como el modelo entrenado con grpo sin kl mejora el resultado obtenido por sft ya que es capaz de adaptarse a datos que no se han observado previamente. Este modelo obtiene un 89.5% de pass@1, un 9% más que el modelo sft y el entrenado con grpo con kl.
+
+![Pass@1 de los modelos base, sft, grpo_sin_kl y grpo con kl y beta = 0.04](../reports/phase1_pass1.png)
+
+**Qué concluimos.** El modelo base falla siempre debido a errores de formato y a que no devuelve las unidades de la respuesta. GRPO sin KL mejora a SFT y a GRPO con KL en test y estos dos últimos obtienen el mismo pass@1.
+
+A continuación, vamos a analizar en qué falla concretamente cada modelo para entender qué ha aprendido en cada paso y qué tiene que aprender aún.
+
+---
+
+### 2026-10-12 · Fase 1 · Análisis de las respuestas obtenidas en el test
+
+**Qué queríamos saber.** Queremos saber qué ha aprendido cada modelo durante cada entrenamiento y queremos comprender si hay un grupo concreto de problemas que el modelo falla para ayudarle a que aprende a resolver ese tipo concreto de ejercicios.
+
+**Qué hicimos.** Para realizar este análisis, hemos escrito un nuevo fichero (`analyze_eval.py`) que analiza varios puntos:
+1. Busca patrones en las respuestas de los modelos para determinar de forma más concreta si siguen el formato y si devuelven la respuesta correcta.
+2. El porcentaje de acierto por familia de problemas
+3. Tipo de respuestas devueltas por cada modelo
+4. Fallos cometidos por el mejor modelo (grpo sin kl)
+
+Para obtener este análisis hay que ejecutar el siguiente comando:
+`uv run python -m rlm.analyze_eval`
+
+**Qué pasó.** Comenzamos analizando si el modelo devuelve la respuesta correcta en el formato correcto. Como podemos ver en la siguiente tabla, el modelo base no devuelve una respuesta más de la mitad de las veces y solo cumple con el formato indicado en un 9,5% de los casos. Además, solo devuelve el valor correcto un 26,5% de las veces. Todo esto explica por qué se obtiene un pass@1 de un 0,0%.
+
+Si comparamos los otros 3 modelos que obtienen respuestas más razonables para el problema, podemos observar como el modelo entrenado con GRPO sin KL presenta mejoras tanto en el formato como en la corrección de la respuesta.
+
+GRPO con KL no mejora el pass@1 de SFT pero su formato es algo mejor (94,0 % frente a 92,5 %) y tiene menos respuestas ausentes (6,0 % frente a 7,5 %).
+
+| Modelo | Valor correcto (`valor_ok`) | Formato válido | Sin respuesta (`sin_answer`) | Pass@1 |
+|---|---:|---:|---:|---:|
+| Base | 26,5 % | 9,5 % | 53,5 % | 0,0 % |
+| SFT | 80,5 % | 92,5 % | 7,5 % | 80,5 % |
+| GRPO sin KL | **89,5 %** | **97,0 %** | **3,0 %** | **89,5 %** |
+| GRPO con KL | 80,5 % | 94,0 % | 6,0 % | 80,5 % |
+
+A continuación, analizamos las tasas de éxito por familia.
+
+| Familia | n | Base | SFT | GRPO sin KL | GRPO con KL |
+|---|---:|---:|---:|---:|---:|
+| Dilution | 40 | 0,00 | 0,75 | **0,95** | 0,82 |
+| Dose/day | 40 | 0,00 | 0,93 | **0,97** | 0,93 |
+| Drops | 40 | 0,00 | 0,78 | **0,88** | 0,78 |
+| Pump | 40 | 0,00 | **0,75** | 0,72 | 0,68 |
+| Volume | 40 | 0,00 | 0,82 | **0,95** | 0,82 |
+
+GRPO sin KL obtiene las mejores puntuaciones en 4 de las 5 familias de problemas que tenemos en el dataset de test. Para la familia de pump, obtiene un 72% de aciertos por lo que pump es el grupo con el mejor margen de mejora en el rendimiento del modelo. Esta familia es la que menores resultados presenta para todos los modelos. Esto muestra como al modelo le cuesta razonar y obtener la respueta correcta.
+
+En la siguiente table podemos observar como el modelo base no devuelve nunca el valor correcto. Esto se debe a que no devuelve la respuesta la mitad de las veces y, cuando devuelve una respuesta, el valor numérico de ésta está mal o no presenta la unidad correcta.
+
+El modelo sft aprende a devolver siempre la unidad correcta por lo que ninguno de los modelos entrenados presenta fallos de esta casuística. También reduce los fallos debido a la falta de respuesta y de valor incorrecto. Esto sugiere que el ajuste supervisado mejora tanto la generación de respuestas completas como el cumplimiento del formato esperado.
+
+| Tipo de resultado | Base | SFT | GRPO sin KL | GRPO con KL |
+|---|---:|---:|---:|---:|
+| Correcto (`ok`) | 0 | 161 | **179** | 161 |
+| Valor correcto, unidad incorrecta (`valor_ok_unidad_mal`) | 53 | 0 | 0 | 0 |
+| Valor incorrecto (`valor_mal`) | 40 | 24 | **15** | 27 |
+| Sin respuesta (`sin_answer`) | 107 | 15 | **6** | 12 |
+| **Total** | **200** | **200** | **200** | **200** |
+
+Por último, vamos a analizar concretamente por qué falla el modelo entrenado con grpo sin KL según los grupos de familias:
+
+| Familia | Valor incorrecto | Sin respuesta | Total de fallos |
+|---|---:|---:|---:|
+| Pump | 6 | 5 | **11** |
+| Drops | 5 | 0 | 5 |
+| Volume | 2 | 0 | 2 |
+| Dose/day | 1 | 0 | 1 |
+| Dilution | 1 | 1 | 2 |
+| **Total** | **15** | **6** | **21** |
+
+Aproximadamente un 25% de los fallos se deben a que el modelo no devuelve una respuesta. Esto se debe a que el razonamiento necesita más tokens de los establecidos como máximo.
+
+De los 15 casos de respuestas incorrectas, 6 pertenecen a la familia de pump. Por lo tanto, ayudar al modelo a resolver estos problemas mejorará su rendimiento.
+
+**Qué concluimos.** El aprendizaje supervisado mejora tanto la generación de respuestas completas como el cumplimiento del formato esperado frente al modelo base. 
+
+De los 3 modelos entrenados, el grpo sin KL muestra las mejores tasas tanto en el formato como en la corrección de la respuesta.
+
+A continuación, analizaremos los fallos cometidos por el modelo entrenado con grpo sin KL
 
 ---

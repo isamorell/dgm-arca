@@ -102,7 +102,7 @@ class ReasoningModel:
         self.model = model.eval()
         self.verifier = VERIFIERS[self.verifier_name]()
 
-    def generate(self, question: str, max_new_tokens: int = 1024) -> tuple[str, int]:
+    def generate(self, question: str, max_new_tokens: int = 1024, greedy: bool = False) -> tuple[str, int]:
         """Return the raw completion and the number of generated tokens."""
         import torch
 
@@ -110,14 +110,18 @@ class ReasoningModel:
             build_prompt(question), tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        
+        if greedy:
+            sampling = {"do_sample": False}
+        else:
+            sampling = {"do_sample": True, "temperature": 0.6, "top_p": 0.95}
+
         with torch.no_grad():
             out = self.model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=0.6,
-                top_p=0.95,
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+                **sampling,
             )
         new_tokens = out[0, inputs["input_ids"].shape[1] :]
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True), int(new_tokens.numel())
