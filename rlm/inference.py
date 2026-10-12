@@ -77,13 +77,20 @@ class ReasoningModel:
                 "LoRA adapter (see rlm/README.md). For a quick check you can point it to the "
                 "adapter produced by the smoke test, rlm/weights/smoke_lora."
             )
+            
         if not Path(adapter).exists():
-            raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter}")
+            repo = os.environ.get("ARCA_RLM_ADAPTER_REPO")
+            if repo:
+                from huggingface_hub import snapshot_download
+                snapshot_download(repo, local_dir=adapter)
+            else:
+                raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter} (define ARCA_RLM_ADAPTER_REPO to download it from Hub)")
+
         base_model = os.environ.get("ARCA_RLM_BASE_MODEL") or _base_model_from_adapter(adapter)
         return cls(
             base_model=base_model,
             adapter_path=adapter,
-            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "numeric"),
+            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "medication"),
         )
 
     def load(self) -> None:
