@@ -315,29 +315,39 @@ correctas. La comprobación real es el pass@1 sobre `rlm/data/test.jsonl` (y `te
 con `rlm/evaluate.py`, comparando el modelo base y el SFT. Está pendiente y es el siguiente
 paso, junto con revisar a mano unos cuantos fallos.
 
-### 2026-10-11 · Fase 1 · GRPO
+### 2026-10-11 · Fase 1 · GRPO sin beta y con beta 0.04
 
-**Qué queríamos saber.** La pregunta o la hipótesis.
-**Qué hicimos.** Comando exacto, modelo, datos, hiperparámetros que cambian respecto a la
-entrada anterior.
+**Qué queríamos saber.** Queríamos saber si el modelo obtiene mejores resultados al aplicarle la penalización kl con beta 0.04 que es la que usan en el paper de DeepSeekMath (https://arxiv.org/pdf/2402.03300) o sin la penalización
 
-Como entrenamos el modelo partiendo del entrenado con SFT, configuramos en el archivo .env una nueva variable con el link. Para ello, añadimos la siguiente línea al fichero:
+**Qué hicimos.** Como entrenamos el modelo partiendo del entrenado con SFT, configuramos en el archivo .env una nueva variable con el enlace al repositorio de Hugging Face Hub donde lo guardamos en el paso antrior. Para ello, añadimos la siguiente línea al fichero:
 `ARCA_SFT_REPO=raquelfes11/dgm-arca-sft-lora`
 
-Sin kl beta
-{'train_runtime': '6498', 'train_samples_per_second': '0.369', 'train_steps_per_second': '0.046', 'train_loss': '0.03227', 'epoch': '0.375'}
+Durante la primera ejecución, vimos que la recompensa de dominio del modelo solía fallar en los ejercicios cuyas unidades eran gotas/min. Vimos que la unidad correcta a devolver era precisamente esa y así descubrimos una errata en el código del `rewards.py`. Tras corregirlo, volvimos a entrenar los dos modelos.
 
-'loss': '0.2363', 'grad_norm': '0.5668', 'learning_rate': '1.667e-08', 'num_tokens': '1.276e+06', 'completions/mean_length': '482', 'completions/min_length': '273', 'completions/max_length': '768', 'completions/clipped_ratio': '0.125', 'completions/mean_terminated_length': '441.1', 'completions/min_terminated_length': '273', 'completions/max_terminated_length': '568', 'rewards/format_reward/mean': '0.875', 'rewards/format_reward/std': '0.3536', 'rewards/accuracy_reward/mean': '0.25', 'rewards/accuracy_reward/std': '0.4629', 'rewards/domain_reward/mean': '0', 'rewards/domain_reward/std': '0', 'reward': '1.125', 'reward_std': '0.6409', 'frac_reward_zero_std': '0', 'entropy': '0.258', 'clip_ratio/low_mean': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/region_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_max': '0', 'step_time': '28.1', 'epoch': '0.375'}
+Para entrenar el modelo sin kl, utilizamos el siguiente comando:
 
-gotas/min
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora`
 
-en la grafica curves_grpo_rewards.png se ve q el maximo se alcanza en el epoch 251 => para la siguiente prueba voy a reducirlo hasta entonces. ademas al añadir kl va a aumentar el tiempo del forward asi q viene mejor tener menos epochs
+que utiliza el modelo finetuneado como base.
 
-pruebo primero con kl beta = 0.04 pq es la del paper https://arxiv.org/pdf/2402.03300 
+Luego, entrenamos el modelo con KL con beta 0.04 para ver cómo afecta esto al entrenamietno. Para ello, ejecutamos este comando:
 
-el corrector estaba poniendo q el modelo no estaba devolvinendo el domain reward para gotas/min cuando esa es la respuesta esperada => habia un fallo en el codigo => una vez he arreglado el fallo, repito los experimentos con beta 0 y 0.04
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --beta 0.04`
 
-**Qué pasó.** Números, curva (enlace a reports/), ejemplos.
-**Qué concluimos.** Y qué hacemos a continuación.
+**Qué pasó.** En la siguiente gráfica, se ve la evolución de las recompensas a lo largo del entrenamiento del modelo sin KL. Como se puede observar, el máximo de 0.992 se alcanza en el step 92.
+
+![Evolución de las recompensas a lo largo del entrenamiento del modelo sin KL](../reports/rlm/final_rlm_lora_sin_kl/curves_grpo_rewards.png)
+
+En cambio, al entrenar el modelo con KL con beta = 0.04, se puede ver como el máximo toma un valor menor (0.971) y en un step temprano, el 37. Esto puede deberse a que el modelo base entrenado con SF ya fuese muy bueno en esta tarea por lo que no hay demasiado hueco para que el entrenamiento con GRPO mejore el rendimiento del modelo.
+
+![Evolución de las recompensas a lo largo del entrenamiento del modelo con KL (beta = 0.04)](../reports/rlm/final_rlm_lora_kl_04/curves_grpo_rewards.png)
+
+Los adaptador se encuentran publicados en Hugging Face: 
+`isamorell/dgm-arca-rlm-lora-sin-kl` (modelo entrenado con grpo y sin KL).
+`isamorell/dgm-arca-rlm-lora-kl-04` (modelo entrenado con grpo y con KL (beta = 0.04)).
+
+**Qué concluimos.** Para ambos casos, el modelo logra máximos muy altos en puntos tempranos del entrenamiento.  Esto puede deberse a que el modelo base ya lo hace muy bien. Por ello, vamos a comparar el rendimiento de los tres modelos en el conjunto de test. 
+
+Además, en train parece que funciona mejor no utilizar KL pero esto puede deberse a que KL está actuando como un freno sobre el entrenamiento para que no se separe demasiado del modelo base. Para ver si el modelo está mejorando al incluir KL, vamos a probar el rendimiento en el conjunto de test utilizando el `evaluate.py`.
 
 ---
