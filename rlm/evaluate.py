@@ -17,8 +17,9 @@ import json
 from pathlib import Path
 
 from rlm.data import load_domain_dataset, load_gsm8k
-from rlm.verifier import NumericVerifier, Verifier
-
+from rlm.inference import ReasoningModel
+from rlm.rewards import has_valid_format
+from rlm.verifier import MedicationVerifier, NumericVerifier, Verifier
 
 def evaluate_model(
     base_model: str, adapter: str | None, dataset, verifier: Verifier, max_new_tokens: int
@@ -29,12 +30,59 @@ def evaluate_model(
     ``is_correct``, ``has_valid_format`` and ``n_tokens``. Reuse ``rlm.inference.ReasoningModel``
     instead of writing generation code again.
     """
-    raise NotImplementedError
+    rlm = ReasoningModel(base_model=base_model, adapter_path=adapter)
+    rlm.load() # loads tokenizer + base model (+ LoRA adapter if given) on GPU or CPU
 
+    rows: list[dict] = []
+    for ex in dataset:
+        # The loaders store the question inside ``prompt`` (system + user messages)
+        question = ex["prompt"][-1]["content"]
+        raw, n_tokens = rlm.generate(question, max_new_tokens)
+
+        if isinstance(verifier, MedicationVerifier):
+            # Same call as rlm.distill: the unit asked by the problem must be in the answer
+            result = verifier.verify(
+                raw, ex["answer"], ex.get("answer_unit"), ex.get("answer_unit_aliases") or {}
+            )
+        else:
+            result = verifier.verify(raw, ex["answer"])
+
+        rows.append(
+            {
+                "question": question,
+                "expected": ex["answer"],
+                "raw": raw,
+                "predicted": result.predicted,
+                "is_correct": result.is_correct,
+                "has_valid_format": has_valid_format(raw),
+                "n_tokens": n_tokens,
+            }
+        )
+
+    return rows
 
 def pass_at_1(rows: list[dict]) -> float:
     return sum(r["is_correct"] for r in rows) / max(len(rows), 1)
 
+def plot_pass1(results: dict, out: Path) -> None:
+    """Bar chart with the pass@1 of every evaluated model."""
+    import matplotlib
+ 
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+ 
+    names = list(results)
+    values = [results[name]["pass@1"] for name in names]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bars = ax.bar(names, values)
+    ax.bar_label(bars, labels=[f"{v:.1%}" for v in values])
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("pass@1")
+    ax.set_title("Phase 1: pass@1")
+    fig.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -51,6 +99,7 @@ def main() -> None:
     parser.add_argument("--n-examples", type=int, default=200)
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--out", default="reports/phase1_eval.json")
+    parser.add_argument("--history", default="reports/phase1_pass1.png")
     args = parser.parse_args()
 
     dataset = (
@@ -58,6 +107,10 @@ def main() -> None:
         if args.data == "gsm8k"
         else load_domain_dataset(args.data)
     )
+
+    # GSM8K has no units and integer answers (a derived tolerance would be too loose there).
+    verifier = NumericVerifier() if args.data == "gsm8k" else MedicationVerifier()
+
     results = {}
     for pair in args.adapters:
         name, path = pair.split("=", 1)
@@ -65,7 +118,7 @@ def main() -> None:
             args.model,
             None if path == "none" else path,
             dataset,
-            NumericVerifier(),
+            verifier,
             args.max_new_tokens,
         )
         results[name] = {"pass@1": pass_at_1(rows), "rows": rows}
@@ -75,6 +128,8 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2, ensure_ascii=False))
     print(f"details -> {out}")
+    plot_pass1(results, Path(args.history))
+    print(f"chart -> {args.history}")
 
 
 if __name__ == "__main__":
