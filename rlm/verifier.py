@@ -23,7 +23,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from rlm.rewards import extract_answer, normalize_number
+from rlm.rewards import extract_answer, normalize_number, units_equivalent
 
 
 @dataclass(frozen=True)
@@ -144,7 +144,7 @@ class MedicationVerifier(NumericVerifier):
         result = super().verify(completion, expected)
         if unit is None or not result.is_correct:
             return result
-        if result.predicted is not None and has_unit(result.predicted, unit, unit_aliases):
+        if result.predicted is not None and units_equivalent(result.predicted, unit, unit_aliases):
             return result
         return VerificationResult(
             False, result.predicted, expected, f"right value but missing or wrong unit ({unit})"

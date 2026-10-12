@@ -29,7 +29,7 @@ import os
 from pathlib import Path
 
 from rlm.data import load_domain_dataset, load_gsm8k
-from rlm.rewards import _completion_text, accuracy_reward, format_reward, extract_answer, extract_final_unit, normalize_unit
+from rlm.rewards import _completion_text, accuracy_reward, format_reward, extract_answer, units_equivalent
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -50,24 +50,11 @@ def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequenc
         text = _completion_text(completion)
 
         predicted = extract_answer(text)
-        if predicted is None:
+        if predicted is None or not expected_unit:
             rewards.append(0.0)
             continue
 
-        predicted_unit = extract_final_unit(predicted)
-        if predicted_unit is None:
-            rewards.append(0.0)
-            continue
-
-        expected = normalize_unit(str(expected_unit))
-        accepted_units = {expected} if expected is not None else set()
-
-        for alias in aliases:
-            normalized_alias = normalize_unit(str(alias))
-            if normalized_alias is not None:
-                accepted_units.add(normalized_alias)
-
-        rewards.append(1.0 if predicted_unit in accepted_units else 0.0)
+        rewards.append(1.0 if units_equivalent(predicted, expected_unit, aliases) else 0.0)
 
     return rewards
 

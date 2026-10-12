@@ -439,16 +439,17 @@ GRPO con KL no mejora el pass@1 de SFT pero su formato es algo mejor (94,0 % fre
 | SFT | 80,5 % | 92,5 % | 7,5 % | 80,5 % |
 | GRPO sin KL | **89,5 %** | **97,0 %** | **3,0 %** | **89,5 %** |
 | GRPO con KL | 80,5 % | 94,0 % | 6,0 % | 80,5 % |
+| GRPO sin KL group 4 | 86,0 % | 94,5 % | 5,5 % | 86,0 % |
 
 A continuación, analizamos las tasas de éxito por familia.
 
-| Familia | n | Base | SFT | GRPO sin KL | GRPO con KL |
-|---|---:|---:|---:|---:|---:|
-| Dilution | 40 | 0,00 | 0,75 | **0,95** | 0,82 |
-| Dose/day | 40 | 0,00 | 0,93 | **0,97** | 0,93 |
-| Drops | 40 | 0,00 | 0,78 | **0,88** | 0,78 |
-| Pump | 40 | 0,00 | **0,75** | 0,72 | 0,68 |
-| Volume | 40 | 0,00 | 0,82 | **0,95** | 0,82 |
+| Familia | n | Base | SFT | GRPO sin KL | GRPO con KL | GRPO sin KL group 4 |
+|---|---:|---:|---:|---:|---:|---:|
+| Dilution | 40 | 0,00 | 0,75 | **0,95** | 0,82 | 0,80 |
+| Dose/day | 40 | 0,00 | 0,93 | **0,97** | 0,93 | 0.93 |
+| Drops | 40 | 0,00 | 0,78 | **0,88** | 0,78 | 0,85 |
+| Pump | 40 | 0,00 | 0,75 | 0,72 | 0,68 | **0,80** |
+| Volume | 40 | 0,00 | 0,82 | **0,95** | 0,82 | 0,93 |
 
 GRPO sin KL obtiene las mejores puntuaciones en 4 de las 5 familias de problemas que tenemos en el dataset de test. Para la familia de pump, obtiene un 72% de aciertos por lo que pump es el grupo con el mejor margen de mejora en el rendimiento del modelo. Esta familia es la que menores resultados presenta para todos los modelos. Esto muestra como al modelo le cuesta razonar y obtener la respueta correcta.
 
@@ -456,13 +457,13 @@ En la siguiente table podemos observar como el modelo base no devuelve nunca el 
 
 El modelo sft aprende a devolver siempre la unidad correcta por lo que ninguno de los modelos entrenados presenta fallos de esta casuística. También reduce los fallos debido a la falta de respuesta y de valor incorrecto. Esto sugiere que el ajuste supervisado mejora tanto la generación de respuestas completas como el cumplimiento del formato esperado.
 
-| Tipo de resultado | Base | SFT | GRPO sin KL | GRPO con KL |
-|---|---:|---:|---:|---:|
-| Correcto (`ok`) | 0 | 161 | **179** | 161 |
-| Valor correcto, unidad incorrecta (`valor_ok_unidad_mal`) | 53 | 0 | 0 | 0 |
-| Valor incorrecto (`valor_mal`) | 40 | 24 | **15** | 27 |
-| Sin respuesta (`sin_answer`) | 107 | 15 | **6** | 12 |
-| **Total** | **200** | **200** | **200** | **200** |
+| Tipo de resultado | Base | SFT | GRPO sin KL | GRPO con KL | GRPO sin KL group 4 |
+|---|---:|---:|---:|---:|---:|
+| Correcto (`ok`) | 0 | 161 | **179** | 161 | 172 |
+| Valor correcto, unidad incorrecta (`valor_ok_unidad_mal`) | 53 | 0 | 0 | 0 | 0 |
+| Valor incorrecto (`valor_mal`) | 40 | 24 | **15** | 27 | 17 |
+| Sin respuesta (`sin_answer`) | 107 | 15 | **6** | 12 | 11 |
+| **Total** | **200** | **200** | **200** | **200** | **200** |
 
 Por último, vamos a analizar concretamente por qué falla el modelo entrenado con grpo sin KL según los grupos de familias:
 
@@ -490,9 +491,14 @@ A continuación, analizaremos los fallos cometidos por el modelo entrenado con g
 ### 2026-10-12 · Fase 1 · Fallos cometidos por el modelo entrenado con GRPO sin KL
 
 **Qué queríamos saber.** La pregunta o la hipótesis.
+
 **Qué hicimos.** Comando exacto, modelo, datos, hiperparámetros que cambian respecto a la
 entrada anterior.
+
+No se comete reward_hacking
+
 **Qué pasó.** Números, curva (enlace a reports/), ejemplos.
+
 **Qué concluimos.** Y qué hacemos a continuación.
 
 ---

@@ -181,6 +181,24 @@ def extract_final_unit(text: str) -> str | None:
     return normalize_unit(raw_unit)
 
 
+def units_equivalent(answer_text: str, expected_unit: str, aliases=()) -> bool:
+    """True when the unit written next to the last number of ``answer_text`` is the expected one."""
+    predicted = extract_final_unit(answer_text)
+    if predicted is None:
+        return False
+    accepted = {normalize_unit(str(u)) for u in (expected_unit, *aliases)}
+    accepted.discard(None)
+    return predicted in accepted
+
+
+def split_expected(expected: str) -> tuple[str, str | None]:
+    """'17 mL' -> ('17', 'mL'); '17' -> ('17', None)."""
+    m = re.match(r"^\s*(-?\d[\d.,]*)\s*(.*?)\s*$", expected)
+    if not m:
+        return expected, None
+    return m.group(1), (m.group(2) or None)
+
+
 def numbers_match(predicted: str | None, expected: str | None) -> bool:
     """Compare two answers numerically after normalisation."""
     if predicted is None or expected is None:

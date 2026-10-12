@@ -9,7 +9,7 @@ laptop, on the DGX and inside Docker:
 
 * ``ARCA_RLM_BASE_MODEL``  base model id (default ``Qwen/Qwen3-0.6B``)
 * ``ARCA_RLM_ADAPTER``     path to your trained LoRA adapter (e.g. ``rlm/weights/final_rlm_lora``)
-* ``ARCA_RLM_VERIFIER``    ``numeric`` (default) or ``exact_match``; register yours in ``VERIFIERS``
+* ``ARCA_RLM_VERIFIER``    ``medication`` (default) or ``exact_match``; register yours in ``VERIFIERS``
 
 Try it from the command line::
 
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from api.schemas import ReasoningResponse, VerifierVerdict
 from rlm.data import build_prompt
-from rlm.rewards import extract_answer, has_valid_format
+from rlm.rewards import extract_answer, has_valid_format, split_expected
 from rlm.verifier import ExactMatchVerifier, NumericVerifier, Verifier, MedicationVerifier
 
 VERIFIERS: dict[str, type[Verifier]] = {
@@ -66,7 +66,7 @@ def _base_model_from_adapter(adapter: str) -> str:
 class ReasoningModel:
     base_model: str
     adapter_path: str | None = None
-    verifier_name: str = "numeric"
+    verifier_name: str = "medication"
 
     @classmethod
     def from_env(cls) -> ReasoningModel:
@@ -140,7 +140,11 @@ class ReasoningModel:
         thinking, answer = split_thinking(raw)
         verdict = None
         if expected_answer is not None:
-            result = self.verifier.verify(raw, expected_answer)
+            if isinstance(self.verifier, MedicationVerifier):
+                number, unit = split_expected(expected_answer)
+                result = self.verifier.verify(raw, number, unit)
+            else:
+                result = self.verifier.verify(raw, expected_answer)
             verdict = VerifierVerdict(
                 is_correct=result.is_correct,
                 predicted=result.predicted,
