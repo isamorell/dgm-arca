@@ -115,7 +115,14 @@ def main() -> None:
     # GSM8K has no units and integer answers (a derived tolerance would be too loose there).
     verifier = NumericVerifier() if args.data == "gsm8k" else MedicationVerifier()
 
-    results = {}
+    out = Path(args.out)
+
+    if out.exists():
+        results = json.loads(out.read_text(encoding="utf-8"))
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        results = {}
+
     for pair in args.adapters:
         name, path = pair.split("=", 1)
         rows = evaluate_model(
@@ -128,8 +135,6 @@ def main() -> None:
         results[name] = {"pass@1": pass_at_1(rows), "rows": rows}
         print(f"{name:>8}: pass@1 = {results[name]['pass@1']:.3f} on {len(rows)} problems")
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2, ensure_ascii=False))
     print(f"details -> {out}")
     plot_pass1(results, Path(args.history))

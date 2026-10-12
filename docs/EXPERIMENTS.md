@@ -386,6 +386,30 @@ Por último, vemos como el modelo entrenado con grpo sin kl mejora el resultado 
 
 **Qué concluimos.** El modelo base falla siempre debido a errores de formato y a que no devuelve las unidades de la respuesta. GRPO sin KL mejora a SFT y a GRPO con KL en test y estos dos últimos obtienen el mismo pass@1.
 
+A continuación vamos a entrenar otro modelo con GRPO sin KL y con otro valor de tamaño de grupo.
+
+---
+
+### 2026-10-12 · Fase 1 · Entrenamiento modelo con GRPO sin KL y con --num-generations = 4
+
+**Qué queríamos saber.** Queremos analizar cómo afecta el número de generaciones al entrenamiento del modelo y a su rendimiento final.
+
+**Qué hicimos.** Comenzamos entrenando el modelo con el parámetro --num-generations = 4. Esto lo hacemos ejecutando el siguiente comando:
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --num-generations 4`
+
+Tras entrenar el modelo, sacamos sus curvas de evolución de la recompensa y la longitud de respuesta ejecutando el comando:
+`uv run python -m rlm.plot_curves rlm/weights/final_rlm_lora --output reports/rlm/final_rlm_lora_sin_kl_group_4/curves_grpo`
+
+Así podremos ver las curvas y obtener el máximo de recompensa media obtenida durante el entrenamiento.
+
+Por último, modifico el evaluate.py para que no se borren los resultados que ya tengo y que solo se añadan los nuevos adicionalmente. Ejecutando el siguiente comando para el nuevo modelo, obtenemos el rendimiento de este en el conjunto de test :
+`uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters grpo_group_4=rlm/weights/final_rlm_lora_sin_kl_group_4`
+
+**Qué pasó.** Números, curva (enlace a reports/), ejemplos.
+
+
+**Qué concluimos.** Y qué hacemos a continuación.
+
 A continuación, vamos a analizar en qué falla concretamente cada modelo para entender qué ha aprendido en cada paso y qué tiene que aprender aún.
 
 ---
@@ -460,5 +484,15 @@ De los 15 casos de respuestas incorrectas, 6 pertenecen a la familia de pump. Po
 De los 3 modelos entrenados, el grpo sin KL muestra las mejores tasas tanto en el formato como en la corrección de la respuesta.
 
 A continuación, analizaremos los fallos cometidos por el modelo entrenado con grpo sin KL
+
+---
+
+### 2026-10-12 · Fase 1 · Fallos cometidos por el modelo entrenado con GRPO sin KL
+
+**Qué queríamos saber.** La pregunta o la hipótesis.
+**Qué hicimos.** Comando exacto, modelo, datos, hiperparámetros que cambian respecto a la
+entrada anterior.
+**Qué pasó.** Números, curva (enlace a reports/), ejemplos.
+**Qué concluimos.** Y qué hacemos a continuación.
 
 ---
