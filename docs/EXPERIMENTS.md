@@ -172,7 +172,19 @@ final tienen menos combinaciones y train ya se ha llevado buena parte de ellas, 
 familia con 40 problemas cada una en test. Con solo 10 problemas de volumen final en test, el
 resultado de ese subtipo de dilución no es fiable, y lo trataremos con cautela en el análisis.
 
-(vuestras entradas, de la más antigua a la más reciente)
+---
+
+### 2026-10-04 · Fase 1 · Definición de la recompensa de dominio
+
+**Qué queríamos saber.** Queríamos definir una recompensa de dominio que fuese importante para nuestra tarea de ayudar a estudiantes de enfermería
+
+**Qué hicimos.** Decidimos que lo mejor era tener una recompensa que penalizase al modelo no utilizar las unidades que pedía el modelo. Para permitirle un poco más de flexibilidad, tenemos en cuenta que las mismas unidades pueden escribirse de distintas formas. Por ejemplo, gotas por minuto se puede abreviar en gotas/min.
+
+También incluimos estas diferentes formas en la extracción de la unidad, que se realiza con cuidado para extraer la unidad que acompaña a la respuesta final y no otra unidad que puede que acompañe a un número distinto.
+
+**Qué pasó.** Generamos diferentes aliases para cada unidad con el fin de poder comparar las diferentes formas en las que referenciamos una misma unidad. Estos los incluimos también en el patrón de regex para extraer las unidades de las respuestas
+
+**Qué concluimos.** Así podremos evaluar la correcta extracción de unidades como la recompensa de dominio.
 
 ---
 
@@ -316,3 +328,184 @@ Esta pérdida mide cuánto se parece el modelo al texto del profesor, no si sus 
 correctas. La comprobación real es el pass@1 sobre `rlm/data/test.jsonl` (y `test_ood.jsonl`)
 con `rlm/evaluate.py`, comparando el modelo base y el SFT. Está pendiente y es el siguiente
 paso, junto con revisar a mano unos cuantos fallos.
+
+### 2026-10-11 · Fase 1 · GRPO sin beta y con beta 0.04
+
+**Qué queríamos saber.** Queríamos saber si el modelo obtiene mejores resultados al aplicarle la penalización kl con beta 0.04 que es la que usan en el paper de DeepSeekMath (https://arxiv.org/pdf/2402.03300) o sin la penalización
+
+**Qué hicimos.** Como entrenamos el modelo partiendo del entrenado con SFT, configuramos en el archivo .env una nueva variable con el enlace al repositorio de Hugging Face Hub donde lo guardamos en el paso antrior. Para ello, añadimos la siguiente línea al fichero:
+`ARCA_SFT_REPO=raquelfes11/dgm-arca-sft-lora`
+
+Durante la primera ejecución, vimos que la recompensa de dominio del modelo solía fallar en los ejercicios cuyas unidades eran gotas/min. Vimos que la unidad correcta a devolver era precisamente esa y así descubrimos una errata en el código del `rewards.py`. Tras corregirlo, volvimos a entrenar los dos modelos.
+
+Para entrenar el modelo sin kl, utilizamos el siguiente comando:
+
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora`
+
+que utiliza el modelo finetuneado como base.
+
+Luego, entrenamos el modelo con KL con beta 0.04 para ver cómo afecta esto al entrenamietno. Para ello, ejecutamos este comando:
+
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --beta 0.04`
+
+**Qué pasó.** En la siguiente gráfica, se ve la evolución de las recompensas a lo largo del entrenamiento del modelo sin KL. Como se puede observar, el máximo de 0.992 se alcanza en el step 92.
+
+![Evolución de las recompensas a lo largo del entrenamiento del modelo sin KL](../reports/rlm/final_rlm_lora_sin_kl/curves_grpo_rewards.png)
+
+En cambio, al entrenar el modelo con KL con beta = 0.04, se puede ver como el máximo toma un valor menor (0.971) y en un step temprano, el 37. Esto puede deberse a que el modelo base entrenado con SF ya fuese muy bueno en esta tarea por lo que no hay demasiado hueco para que el entrenamiento con GRPO mejore el rendimiento del modelo.
+
+![Evolución de las recompensas a lo largo del entrenamiento del modelo con KL (beta = 0.04)](../reports/rlm/final_rlm_lora_kl_04/curves_grpo_rewards.png)
+
+Los adaptador se encuentran publicados en Hugging Face: 
+`isamorell/dgm-arca-rlm-lora-sin-kl` (modelo entrenado con grpo y sin KL).
+`isamorell/dgm-arca-rlm-lora-kl-04` (modelo entrenado con grpo y con KL (beta = 0.04)).
+
+**Qué concluimos.** Para ambos casos, el modelo logra máximos muy altos en puntos tempranos del entrenamiento.  Esto puede deberse a que el modelo base ya lo hace muy bien. Por ello, vamos a comparar el rendimiento de los tres modelos en el conjunto de test. 
+
+Además, en train parece que funciona mejor no utilizar KL pero esto puede deberse a que KL está actuando como un freno sobre el entrenamiento para que no se separe demasiado del modelo base. Para ver si el modelo está mejorando al incluir KL, vamos a probar el rendimiento en el conjunto de test utilizando el `evaluate.py`.
+
+---
+
+### 2026-10-12 · Fase 1 · Pass@1 de los 3 modelos entrenados y del modelo base
+
+**Qué queríamos saber.** Queremos saber que modelo generaliza mejor en test para poder analizar si grpo mejora el rendimiento del modelo frente al sft, y si utilizar kl con beta 0.04 mejora frente a no usar kl.
+
+**Qué hicimos.** Hemos calculado el Pass@1 de los modelos base, sft y grpo sin KL y con KL beta = 0.04 ejecutando el `evalute.py` con el siguiente comando:
+
+`uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters base=none sft=rlm/weights/sft_lora grpo_sin_kl=rlm/weights/final_rlm_lora_sin_kl grpo=rlm/weights/final_rlm_lora_04`
+
+**Qué pasó.** La ejecución ha tardado más de dos horas ya que la inferencia se ha ido haciendo 1 a 1, sin batching.
+
+Como podemos observar en la imagen siguiente, el modelo base obtiene un 0.0% de pass@1. Esto se debe a que sin el sft, el modelo no ha aprendido el formato y lo rompe añadiendo un bloque `<reasoning process> ... </reasoning process>`. Además, responde sin unidades lo que no cumple con la recompensa de dominio.
+
+Una vez el modelo aprende a razonar, la puntuación sube a 80.5%. Este valor coincide para el sft y el grpo con kl con beta = 0.04. Esto probablemente se deba a que el modelo se encuentra en una zona plana de la que no puede salir debido a la penalización kl. Esto se puede deducir también del análisis anterior en el que se vio que la máxima recompensa obtenida en el entrenamiento fue en el paso 37, indicando que a partir de ese punto el modelo no es capaz de mejorar.
+
+Por último, vemos como el modelo entrenado con grpo sin kl mejora el resultado obtenido por sft ya que es capaz de adaptarse a datos que no se han observado previamente. Este modelo obtiene un 89.5% de pass@1, un 9% más que el modelo sft y el entrenado con grpo con kl.
+
+![Pass@1 de los modelos base, sft, grpo_sin_kl y grpo con kl y beta = 0.04](../reports/phase1_pass1.png)
+
+**Qué concluimos.** El modelo base falla siempre debido a errores de formato y a que no devuelve las unidades de la respuesta. GRPO sin KL mejora a SFT y a GRPO con KL en test y estos dos últimos obtienen el mismo pass@1.
+
+A continuación vamos a entrenar otro modelo con GRPO sin KL y con otro valor de tamaño de grupo.
+
+---
+
+### 2026-10-12 · Fase 1 · Entrenamiento modelo con GRPO sin KL y con --num-generations = 4
+
+**Qué queríamos saber.** Queremos analizar cómo afecta el número de generaciones al entrenamiento del modelo y a su rendimiento final.
+
+**Qué hicimos.** Comenzamos entrenando el modelo con el parámetro --num-generations = 4. Esto lo hacemos ejecutando el siguiente comando:
+`uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --num-generations 4`
+
+Tras entrenar el modelo, sacamos sus curvas de evolución de la recompensa y la longitud de respuesta ejecutando el comando:
+`uv run python -m rlm.plot_curves rlm/weights/final_rlm_lora --output reports/rlm/final_rlm_lora_sin_kl_group_4/curves_grpo`
+
+Así podremos ver las curvas y obtener el máximo de recompensa media obtenida durante el entrenamiento.
+
+Por último, modificamos el evaluate.py para que no se borren los resultados que ya tengo y que solo se añadan los nuevos adicionalmente. Ejecutando el siguiente comando para el nuevo modelo, obtenemos el rendimiento de este en el conjunto de test :
+`uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters grpo_group_4=rlm/weights/final_rlm_lora_sin_kl_group_4`
+
+**Qué pasó.** Este modelo obtiene un 86% de pass@1. La diferencia principal con los otros dos modelos que hemos entrenado con GRPO es que, en este caso, hemos utilizado 4 generaciones en vez de 8 para calcular las recompensas.
+
+Las curvas de los tres modelos siguen un patrón similar como se puede apreciar en las siguientes 3 imágenes. Las recompensas comienzan en valores por debajo del 0.5 y en torno al paso 25 ya se encuentran por encima del 0.8. La longitud media de las respuestas decae de 600 a unos 300-400 tokens cuando el modelo empieza a razonar correctamente y obtener las respuestas esperadas. El impacto de bajar el número de generaciones de 8 a 4 se puede observar en que las curvas son más ruidosas y la desviación de la recompensa dentro del grupo es un poco mayor. 
+
+![Evolución de diferentes métricas a lo largo del entrenamiento del modelo sin KL (num-generations = 8)](../reports/rlm/final_rlm_lora_sin_kl/curves_grpo.png)
+
+![Evolución de diferentes métricas a lo largo del entrenamiento del modelo con KL (beta = 0.04, num-generations = 8)](../reports/rlm/final_rlm_lora_kl_04/curves_grpo.png)
+
+![Evolución de diferentes métricas a lo largo del entrenamiento del modelo sin KL (num-generations = 4)](../reports/rlm/final_rlm_lora_sin_kl_group_4/curves_grpo.png)
+
+**Qué concluimos.** Por lo tanto, el mejor modelo continúa siendo el modelo entrenado con GRPO, sin KL y con 8 generaciones de respuestas ya que es el que obtiene un mejor pass@1 y es más estable que el modelo de 4 generaciones.
+
+A continuación, vamos a analizar en qué falla concretamente cada modelo para entender qué ha aprendido en cada paso y qué tiene que aprender aún.
+
+---
+
+### 2026-10-12 · Fase 1 · Análisis de las respuestas obtenidas en el test
+
+**Qué queríamos saber.** Queremos saber qué ha aprendido cada modelo durante cada entrenamiento y queremos comprender si hay un grupo concreto de problemas que el modelo falla para ayudarle a que aprende a resolver ese tipo concreto de ejercicios.
+
+**Qué hicimos.** Para realizar este análisis, hemos escrito un nuevo fichero (`analyze_eval.py`) que analiza varios puntos:
+1. Busca patrones en las respuestas de los modelos para determinar de forma más concreta si siguen el formato y si devuelven la respuesta correcta.
+2. El porcentaje de acierto por familia de problemas
+3. Tipo de respuestas devueltas por cada modelo
+4. Fallos cometidos por el mejor modelo (grpo sin kl)
+
+Para obtener este análisis hay que ejecutar el siguiente comando:
+`uv run python -m rlm.analyze_eval`
+
+**Qué pasó.** Comenzamos analizando si el modelo devuelve la respuesta correcta en el formato correcto. Como podemos ver en la siguiente tabla, el modelo base no devuelve una respuesta más de la mitad de las veces y solo cumple con el formato indicado en un 9,5% de los casos. Además, solo devuelve el valor correcto un 26,5% de las veces. Todo esto explica por qué se obtiene un pass@1 de un 0,0%.
+
+Si comparamos los otros 4 modelos que obtienen respuestas más razonables para el problema, podemos observar como el modelo entrenado con GRPO sin KL presenta las mayores mejoras tanto en el formato como en la corrección de la respuesta.
+
+GRPO con KL no mejora el pass@1 de SFT pero su formato es algo mejor (94,0 % frente a 92,5 %) y tiene menos respuestas ausentes (6,0 % frente a 7,5 %). Y el modelo de GRPO sin KL mejora todas las métricas frente a estos dos.
+
+| Modelo | Valor correcto (`valor_ok`) | Formato válido | Sin respuesta (`sin_answer`) | Pass@1 |
+|---|---:|---:|---:|---:|
+| Base | 26,5 % | 9,5 % | 53,5 % | 0,0 % |
+| SFT | 80,5 % | 92,5 % | 7,5 % | 80,5 % |
+| GRPO sin KL | **89,5 %** | **97,0 %** | **3,0 %** | **89,5 %** |
+| GRPO con KL | 80,5 % | 94,0 % | 6,0 % | 80,5 % |
+| GRPO sin KL group 4 | 86,0 % | 94,5 % | 5,5 % | 86,0 % |
+
+A continuación, analizamos las tasas de éxito por familia.
+
+| Familia | n | Base | SFT | GRPO sin KL | GRPO con KL | GRPO sin KL group 4 |
+|---|---:|---:|---:|---:|---:|---:|
+| Dilution | 40 | 0,00 | 0,75 | **0,95** | 0,82 | 0,80 |
+| Dose/day | 40 | 0,00 | 0,93 | **0,97** | 0,93 | 0.93 |
+| Drops | 40 | 0,00 | 0,78 | **0,88** | 0,78 | 0,85 |
+| Pump | 40 | 0,00 | 0,75 | 0,72 | 0,68 | **0,80** |
+| Volume | 40 | 0,00 | 0,82 | **0,95** | 0,82 | 0,93 |
+
+GRPO sin KL obtiene las mejores puntuaciones en 4 de las 5 familias de problemas que tenemos en el dataset de test. Para la familia de pump, obtiene un 72% de aciertos por lo que pump es el grupo con el mejor margen de mejora en el rendimiento del modelo. Esta familia es la que menores resultados presenta para todos los modelos. Esto muestra como al modelo le cuesta razonar y obtener la respueta correcta.
+
+En la siguiente tabla podemos observar como el modelo base no devuelve nunca el valor correcto. Esto se debe a que no devuelve la respuesta la mitad de las veces y, cuando devuelve una respuesta, el valor numérico de ésta está mal o no presenta la unidad correcta.
+
+El modelo SFT aprende a devolver siempre la unidad correcta por lo que ninguno de los modelos entrenados presenta fallos de esta casuística. También reduce los fallos debido a la falta de respuesta y de valor incorrecto. Esto sugiere que el ajuste supervisado mejora tanto la generación de respuestas completas como el cumplimiento del formato esperado.
+
+| Tipo de resultado | Base | SFT | GRPO sin KL | GRPO con KL | GRPO sin KL group 4 |
+|---|---:|---:|---:|---:|---:|
+| Correcto (`ok`) | 0 | 161 | **179** | 161 | 172 |
+| Valor correcto, unidad incorrecta (`valor_ok_unidad_mal`) | 53 | 0 | 0 | 0 | 0 |
+| Valor incorrecto (`valor_mal`) | 40 | 24 | **15** | 27 | 17 |
+| Sin respuesta (`sin_answer`) | 107 | 15 | **6** | 12 | 11 |
+| **Total** | **200** | **200** | **200** | **200** | **200** |
+
+Por último, vamos a analizar concretamente por qué falla el modelo entrenado con grpo sin KL según los grupos de familias:
+
+| Familia | Valor incorrecto | Sin respuesta | Total de fallos |
+|---|---:|---:|---:|
+| Pump | 6 | 5 | **11** |
+| Drops | 5 | 0 | 5 |
+| Volume | 2 | 0 | 2 |
+| Dose/day | 1 | 0 | 1 |
+| Dilution | 1 | 1 | 2 |
+| **Total** | **15** | **6** | **21** |
+
+Aproximadamente un 25% de los fallos se deben a que el modelo no devuelve una respuesta. Esto se debe a que el razonamiento necesita más tokens de los establecidos como máximo.
+
+De los 15 casos de respuestas incorrectas, 6 pertenecen a la familia de pump. Por lo tanto, ayudar al modelo a resolver estos problemas mejorará su rendimiento.
+
+**Qué concluimos.** El aprendizaje supervisado mejora tanto la generación de respuestas completas como el cumplimiento del formato esperado frente al modelo base. 
+
+De los 3 modelos entrenados, el grpo sin KL muestra las mejores tasas tanto en el formato como en la corrección de la respuesta.
+
+A continuación, analizaremos los fallos cometidos por el modelo entrenado con grpo sin KL
+
+---
+
+### 2026-MM-DD · Fase 1 · Fallos cometidos por el modelo entrenado con GRPO sin KL
+
+**Qué queríamos saber.** La pregunta o la hipótesis.
+
+**Qué hicimos.** Comando exacto, modelo, datos, hiperparámetros que cambian respecto a la
+entrada anterior.
+
+No se comete reward_hacking
+
+**Qué pasó.** Números, curva (enlace a reports/), ejemplos.
+
+**Qué concluimos.** Y qué hacemos a continuación.
+
+---

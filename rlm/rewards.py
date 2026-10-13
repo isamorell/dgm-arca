@@ -109,6 +109,96 @@ def normalize_number(text: str) -> str | None:
     return f"{value:g}"
 
 
+# Unit aliases used by the domain verifier.
+# Keys are canonical units; values are accepted spellings/aliases.
+UNIT_ALIASES = {
+    "mL": {"ml", "milliliter", "milliliters", "millilitre", "millilitres", "cc"},
+    "L": {"l", "liter", "liters", "litre", "litres"},
+    "mg": {"mg", "milligram", "milligrams", "milligramo", "miligramos"},
+    "g": {"g", "gram", "grams", "gramo", "gramos"},
+    "mcg": {"mcg", "μg", "ug", "microgram", "micrograms", "microgramo", "microgramos"},
+    "kg": {"kg", "kilogram", "kilograms", "kilogramo", "kilogramos"},
+    "min": {"min", "mins", "minute", "minutes", "minuto", "minutos"},
+    "h": {"h", "hr", "hrs", "hour", "hours", "hora", "horas"},
+    "gotas": {"drop", "drops", "gota", "gotas", "gtt"},
+    "gotas/min": {
+        "gotas/min", "gotas/minuto", "gotas/minutos", "gotaspormin", "gotasporminuto",
+        "gtt/min", "gtt/minuto", "drops/min", "drops/minute", "dropspermin", "dropsperminute",
+    },
+    "mL/h": {"ml/h", "ml/hr", "ml/hora", "ml/horas", "mlporhora"},
+    "mL/min": {"ml/min", "ml/minuto", "ml/minute", "mlpormin", "mlporminuto"},
+    "mg/mL": {"mg/ml", "mg/milliliter", "mg/millilitre"},
+}
+
+
+def normalize_unit(unit: str) -> str | None:
+    """Return the canonical representation of a unit.
+
+    Examples:
+        "ml" -> "mL"
+        "CC" -> "mL"
+        "millilitros" -> "mL"
+        "mg" -> "mg"
+    """
+    cleaned = unit.strip().lower()
+    cleaned = re.sub(r"\s+", "", cleaned)
+
+    for canonical, aliases in UNIT_ALIASES.items():
+        if cleaned == canonical.lower() or cleaned in aliases:
+            return canonical
+
+    return None
+
+
+def extract_final_unit(text: str) -> str | None:
+    """Extract the unit associated with the final numerical answer.
+
+    The function looks near the last number in the extracted answer, rather
+    than searching the whole reasoning trace. This prevents intermediate
+    units from being mistaken for the final answer's unit.
+    """
+    # Number followed by a unit: "95 mL", "95ml", "5 mg/mL", etc.
+    unit_pattern = (
+        r"(?:(?:gotas?|gtt|drops?)\s*(?:/|por|per)\s*min(?:uto|ute)?s?"
+        r"|mg\s*/\s*ml"
+        r"|ml\s*/\s*(?:hr|hora|horas|h)"
+        r"|ml\s*/\s*(?:min|minuto|minute)"
+        r"|mL|ml|L|l|mg|mcg|μg|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
+    )
+
+    matches = list(
+        re.finditer(
+            rf"-?\d[\d,.]*(?:\.\d+)?\s*(?P<unit>{unit_pattern})(?!\w)",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
+
+    if not matches:
+        return None
+
+    raw_unit = matches[-1].group("unit")
+    return normalize_unit(raw_unit)
+
+
+def units_equivalent(answer_text: str, expected_unit: str, aliases=()) -> bool:
+    """True when the unit written next to the last number of ``answer_text`` is the expected one."""
+    predicted = extract_final_unit(answer_text)
+    if predicted is None:
+        return False
+    accepted = {normalize_unit(str(u)) for u in (expected_unit, *aliases)}
+    accepted.discard(None)
+    return predicted in accepted
+
+
+def split_expected(expected: str) -> tuple[str, str | None]:
+    """'17 mL' -> ('17', 'mL'); '17' -> ('17', None)."""
+    m = re.match(r"^\s*(-?\d[\d.,]*)\s*(.*?)\s*$", expected)
+    if not m:
+        return expected, None
+    return m.group(1), (m.group(2) or None)
+
+
 def numbers_match(predicted: str | None, expected: str | None) -> bool:
     """Compare two answers numerically after normalisation."""
     if predicted is None or expected is None:

@@ -37,7 +37,7 @@ def evaluate_model(
     for ex in dataset:
         # The loaders store the question inside ``prompt`` (system + user messages)
         question = ex["prompt"][-1]["content"]
-        raw, n_tokens = rlm.generate(question, max_new_tokens)
+        raw, n_tokens = rlm.generate(question, max_new_tokens, greedy=True)
 
         if isinstance(verifier, MedicationVerifier):
             # Same call as rlm.distill: the unit asked by the problem must be in the answer
@@ -47,10 +47,14 @@ def evaluate_model(
         else:
             result = verifier.verify(raw, ex["answer"])
 
+        unit = ex.get("answer_unit")
         rows.append(
             {
                 "question": question,
-                "expected": ex["answer"],
+                "family": ex.get("family"),
+                "expected": f"{ex['answer']} {unit}" if unit else ex["answer"],
+                "expected_value": ex["answer"],
+                "expected_unit": unit,
                 "raw": raw,
                 "predicted": result.predicted,
                 "is_correct": result.is_correct,
@@ -111,7 +115,14 @@ def main() -> None:
     # GSM8K has no units and integer answers (a derived tolerance would be too loose there).
     verifier = NumericVerifier() if args.data == "gsm8k" else MedicationVerifier()
 
-    results = {}
+    out = Path(args.out)
+
+    if out.exists():
+        results = json.loads(out.read_text(encoding="utf-8"))
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        results = {}
+
     for pair in args.adapters:
         name, path = pair.split("=", 1)
         rows = evaluate_model(
@@ -124,8 +135,6 @@ def main() -> None:
         results[name] = {"pass@1": pass_at_1(rows), "rows": rows}
         print(f"{name:>8}: pass@1 = {results[name]['pass@1']:.3f} on {len(rows)} problems")
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2, ensure_ascii=False))
     print(f"details -> {out}")
     plot_pass1(results, Path(args.history))

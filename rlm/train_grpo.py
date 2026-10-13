@@ -24,12 +24,17 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from huggingface_hub import snapshot_download
+import os
+from pathlib import Path
 
 from rlm.data import load_domain_dataset, load_gsm8k
-from rlm.rewards import _completion_text, accuracy_reward, format_reward
+from rlm.rewards import _completion_text, accuracy_reward, format_reward, extract_answer, units_equivalent
 
+from dotenv import load_dotenv
+load_dotenv()
 
-def domain_reward(prompts: Sequence, completions: Sequence, **kwargs) -> list[float]:
+def domain_reward(prompts: Sequence, completions: Sequence, answer_unit: Sequence[str], answer_unit_aliases: Sequence[Sequence[str]], **kwargs) -> list[float]:
     """Tu turno: a reward that captures what "good" means in your domain.
 
     Same signature as the other rewards: one float per completion, dataset columns arrive
@@ -39,11 +44,19 @@ def domain_reward(prompts: Sequence, completions: Sequence, **kwargs) -> list[fl
     * length shaping: penalise thinking that exceeds a budget, or reward concise answers;
     * a units check for physical quantities; a schema check for structured answers;
     * a code-execution reward: run the unit tests of the problem (only in a sandbox!).
-
-    Until you implement it, it returns 0.0 everywhere so the script still runs.
     """
-    texts = [_completion_text(c) for c in completions]
-    return [0.0 for _ in texts]
+    rewards: list[float] = []
+    for completion, expected_unit, aliases in zip(completions, answer_unit, answer_unit_aliases, strict=True,):
+        text = _completion_text(completion)
+
+        predicted = extract_answer(text)
+        if predicted is None or not expected_unit:
+            rewards.append(0.0)
+            continue
+
+        rewards.append(1.0 if units_equivalent(predicted, expected_unit, aliases) else 0.0)
+
+    return rewards
 
 
 def train(args: argparse.Namespace) -> None:
@@ -79,10 +92,18 @@ def train(args: argparse.Namespace) -> None:
         log_completions=True,
         num_completions_to_print=2,
         model_init_kwargs={"dtype": torch.bfloat16 if device == "cuda" else torch.float32},
-        # Tu turno: reward_weights=[1.0, 2.0, 0.5] lets you weight format / accuracy / domain.
+        # TODO: reward_weights=[1.0, 2.0, 0.5] lets you weight format / accuracy / domain.
     )
 
     if args.init_adapter:
+        if not Path(args.init_adapter).exists():
+            sft_repo = os.environ.get("ARCA_SFT_REPO")
+            if not sft_repo:
+                raise SystemExit(
+                    f"{args.init_adapter} no existe y ARCA_SFT_REPO no está definida en el entorno/.env"
+                )
+            snapshot_download(sft_repo, local_dir=args.init_adapter)
+
         # Continue training the SFT adapter: load base + adapter as a trainable PeftModel.
         from peft import PeftModel
         from transformers import AutoModelForCausalLM

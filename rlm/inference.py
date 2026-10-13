@@ -9,7 +9,7 @@ laptop, on the DGX and inside Docker:
 
 * ``ARCA_RLM_BASE_MODEL``  base model id (default ``Qwen/Qwen3-0.6B``)
 * ``ARCA_RLM_ADAPTER``     path to your trained LoRA adapter (e.g. ``rlm/weights/final_rlm_lora``)
-* ``ARCA_RLM_VERIFIER``    ``numeric`` (default) or ``exact_match``; register yours in ``VERIFIERS``
+* ``ARCA_RLM_VERIFIER``    ``medication`` (default) or ``exact_match``; register yours in ``VERIFIERS``
 
 Try it from the command line::
 
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from api.schemas import ReasoningResponse, VerifierVerdict
 from rlm.data import build_prompt
-from rlm.rewards import extract_answer, has_valid_format
+from rlm.rewards import extract_answer, has_valid_format, split_expected
 from rlm.verifier import ExactMatchVerifier, NumericVerifier, Verifier, MedicationVerifier
 
 VERIFIERS: dict[str, type[Verifier]] = {
@@ -66,7 +66,7 @@ def _base_model_from_adapter(adapter: str) -> str:
 class ReasoningModel:
     base_model: str
     adapter_path: str | None = None
-    verifier_name: str = "numeric"
+    verifier_name: str = "medication"
 
     @classmethod
     def from_env(cls) -> ReasoningModel:
@@ -77,13 +77,20 @@ class ReasoningModel:
                 "LoRA adapter (see rlm/README.md). For a quick check you can point it to the "
                 "adapter produced by the smoke test, rlm/weights/smoke_lora."
             )
+            
         if not Path(adapter).exists():
-            raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter}")
+            repo = os.environ.get("ARCA_RLM_ADAPTER_REPO")
+            if repo:
+                from huggingface_hub import snapshot_download
+                snapshot_download(repo, local_dir=adapter)
+            else:
+                raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter} (define ARCA_RLM_ADAPTER_REPO to download it from Hub)")
+
         base_model = os.environ.get("ARCA_RLM_BASE_MODEL") or _base_model_from_adapter(adapter)
         return cls(
             base_model=base_model,
             adapter_path=adapter,
-            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "numeric"),
+            verifier_name=os.environ.get("ARCA_RLM_VERIFIER", "medication"),
         )
 
     def load(self) -> None:
@@ -102,7 +109,7 @@ class ReasoningModel:
         self.model = model.eval()
         self.verifier = VERIFIERS[self.verifier_name]()
 
-    def generate(self, question: str, max_new_tokens: int = 1024) -> tuple[str, int]:
+    def generate(self, question: str, max_new_tokens: int = 1024, greedy: bool = False) -> tuple[str, int]:
         """Return the raw completion and the number of generated tokens."""
         import torch
 
@@ -110,14 +117,18 @@ class ReasoningModel:
             build_prompt(question), tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        
+        if greedy:
+            sampling = {"do_sample": False}
+        else:
+            sampling = {"do_sample": True, "temperature": 0.6, "top_p": 0.95}
+
         with torch.no_grad():
             out = self.model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=0.6,
-                top_p=0.95,
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+                **sampling,
             )
         new_tokens = out[0, inputs["input_ids"].shape[1] :]
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True), int(new_tokens.numel())
@@ -129,7 +140,11 @@ class ReasoningModel:
         thinking, answer = split_thinking(raw)
         verdict = None
         if expected_answer is not None:
-            result = self.verifier.verify(raw, expected_answer)
+            if isinstance(self.verifier, MedicationVerifier):
+                number, unit = split_expected(expected_answer)
+                result = self.verifier.verify(raw, number, unit)
+            else:
+                result = self.verifier.verify(raw, expected_answer)
             verdict = VerifierVerdict(
                 is_correct=result.is_correct,
                 predicted=result.predicted,
