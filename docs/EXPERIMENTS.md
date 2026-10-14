@@ -55,9 +55,9 @@ para la fase 1: los datos de posología y dilución están en texto libre, depen
 la edad y la vía, y extraerlos exigiría que alguien del equipo leyese cada ficha y sacase los 
 números a mano. En su lugar, muestreamos de listas de valores redondos (p.ej. dosis 5, 10, 25 mg;
 viales 100mg/5mL) y descartamos los problemas cuya respuesta cae fuera de un rango plausible 
-(`BOUNDS` en `generate_medication.py`).
+(`BOUNDS` en `generate_problems.py`).
 
-El generador sigue el patrón de `generate_problems.py` (estrategia 1 de `datasets.md`): 
+El generador utiliza la plantilla de `generate_problems.py` (estrategia 1 de `datasets.md`): 
 un sorteo de parámetros, una implementación de referencia (`solve`) que es a la vez el verificador, 
 y varias plantillas de enunciado. Toda la aritmética se hace con `Fraction`, de modo que el resultado 
 es exacto y el redondeo es siempre half-up. Se usa `Fraction` en lugar de Pint porque es exacto 
@@ -66,9 +66,9 @@ y determinista; Pint se usará en la herramienta de cálculo de la fase 2, como 
 Comandos (semilla por defecto, `DEFAULT_SEED = 0`):
 
 ```bash
-uv run python -m rlm.generate_medication --n 800 --split train --out rlm/data/train.jsonl
-uv run python -m rlm.generate_medication --n 200 --split test  --out rlm/data/test.jsonl --avoid rlm/data/train.jsonl
-uv run python -m rlm.generate_medication --n 100 --split ood   --out rlm/data/test_ood.jsonl
+uv run python -m rlm.generate_problems --n 800 --split train --out rlm/data/train.jsonl
+uv run python -m rlm.generate_problems --n 200 --split test  --out rlm/data/test.jsonl --avoid rlm/data/train.jsonl
+uv run python -m rlm.generate_problems --n 100 --split ood   --out rlm/data/test_ood.jsonl
 ```
 
 **Qué pasó.** El generador produce problemas con la aritmética correcta, pero las dosis no son 
@@ -139,7 +139,7 @@ repetidos y las demás familias ocupaban ese sitio. Además, test se genera con 
 train y solo recibía las combinaciones que train había dejado libres. Con 12 y 11 problemas de
 `pump` y `dilution` en test no se podía analizar el pass@1 por familia.
 
-**Qué hicimos.** Dos cambios en `generate_medication.py`:
+**Qué hicimos.** Dos cambios en `generate_problems.py`:
 
 1. Espacios de parámetros más grandes: el tiempo pasa de 13 valores a uno cada 15 minutos
    entre 30 min y 12 h (más 24 h); el volumen es una bolsa estándar el 40 % de las veces y en
