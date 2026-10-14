@@ -12,6 +12,10 @@ Run::
 
 and it writes ``reports/ood_comparison.md`` (tables ready to paste in docs/EXPERIMENTS.md).
 
+If the verifier has changed since ``rlm.evaluate`` ran (for example it learned a new unit), add
+``--rescore``: every stored generation is scored again with the current verifier, with no GPU
+and nothing generated, and the report says how many verdicts changed.
+
 Statistics, kept deliberately simple because each set has only 100-200 problems:
 
 * **pass@1 interval**: Wilson score interval at 95 %. It behaves well for proportions close
@@ -94,6 +98,13 @@ def summarize(rows: Sequence[Row], value_matches: ValueMatches) -> dict:
     n = len(rows)
     correct = sum(bool(r["is_correct"]) for r in rows)
     kinds = Counter(classify(r, value_matches) for r in rows)
+    rescore = None
+    if rows and all("is_correct_original" in r for r in rows):
+        rescore = {
+            "before": sum(bool(r["is_correct_original"]) for r in rows),
+            "gained": sum(bool(r["is_correct"]) and not r["is_correct_original"] for r in rows),
+            "lost": sum(not r["is_correct"] and bool(r["is_correct_original"]) for r in rows),
+        }
     families: dict[str, dict[str, int]] = {}
     for family in sorted({r.get("family") or "?" for r in rows}):
         subset = [r for r in rows if (r.get("family") or "?") == family]
@@ -109,6 +120,7 @@ def summarize(rows: Sequence[Row], value_matches: ValueMatches) -> dict:
         "valid_format": sum(bool(r["has_valid_format"]) for r in rows) / n if n else 0.0,
         "kinds": {kind: kinds.get(kind, 0) for kind in KINDS},
         "families": families,
+        "rescore": rescore,
     }
 
 
@@ -210,6 +222,27 @@ def format_markdown(report: dict) -> str:
             f"| {points(entry['drop'])} {interval(*entry['drop_ci'])} |"
         )
 
+    if any(report["models"][m][s]["rescore"] for m in models for s in ("test", "ood")):
+        lines += [
+            "",
+            "## Efecto de volver a puntuar con el verificador actual",
+            "",
+            "Las respuestas guardadas se han puntuado de nuevo, sin volver a generar nada.",
+            "",
+            "| Modelo | Conjunto | Aciertos antes | Aciertos después | Pasan a correctas | "
+            "Pasan a incorrectas |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+        for model in models:
+            for split in ("test", "ood"):
+                part = report["models"][model][split]
+                if part["rescore"]:
+                    r = part["rescore"]
+                    lines.append(
+                        f"| {model} | {split} | {r['before']}/{part['n']} | "
+                        f"{part['correct']}/{part['n']} | {r['gained']} | {r['lost']} |"
+                    )
+
     lines += ["", "## Aciertos por familia en OOD", ""]
     families = sorted({f for m in models for f in report["models"][m]["ood"]["families"]})
     lines += [
@@ -271,6 +304,49 @@ def load_results(path: str | Path) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def rescore_rows(rows: Sequence[Row], lookup: dict, verify: Callable) -> list[Row]:
+    """Score the stored generations again with the current verifier (nothing is generated).
+
+    ``lookup`` maps the question to ``(answer_unit, answer_unit_aliases)`` and ``verify`` has
+    the signature of ``MedicationVerifier.verify``. The previous verdict is kept in
+    ``is_correct_original`` so that the report can say what the new verifier changed.
+    """
+    rescored = []
+    for row in rows:
+        if row["question"] not in lookup:
+            raise KeyError(f"problem not found in the dataset: {row['question'][:60]!r}")
+        unit, aliases = lookup[row["question"]]
+        result = verify(row["raw"], row["expected_value"], unit, aliases)
+        rescored.append(
+            {
+                **row,
+                "is_correct": bool(result.is_correct),
+                "predicted": result.predicted,
+                "is_correct_original": bool(row["is_correct"]),
+            }
+        )
+    return rescored
+
+
+def rescore_results(results: dict, lookup: dict, verify: Callable, models: Sequence[str]) -> dict:
+    """``rescore_rows`` for every requested model of an ``rlm.evaluate`` result file."""
+    return {
+        model: {**results[model], "rows": rescore_rows(results[model]["rows"], lookup, verify)}
+        for model in models
+        if model in results
+    }
+
+
+def build_lookup(path: str | Path) -> dict:
+    """question -> (answer_unit, answer_unit_aliases), read like ``rlm.evaluate`` reads it."""
+    from rlm.data import load_domain_dataset
+
+    return {
+        ex["prompt"][-1]["content"]: (ex.get("answer_unit"), ex.get("answer_unit_aliases") or [])
+        for ex in load_domain_dataset(path)
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -283,6 +359,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--models", nargs="+", default=["sft", "grpo_sin_kl"], help="names used in --adapters"
     )
     parser.add_argument("--out", default="reports/ood_comparison.md")
+    parser.add_argument(
+        "--rescore",
+        action="store_true",
+        help="score the stored generations again with the current verifier (no GPU needed)",
+    )
+    parser.add_argument("--test-data", default="rlm/data/test.jsonl", help="used by --rescore")
+    parser.add_argument("--ood-data", default="rlm/data/test_ood.jsonl", help="used by --rescore")
     return parser
 
 
@@ -295,7 +378,11 @@ def main() -> None:
     def value_matches(row: Row) -> bool:
         return verifier.is_correct(row["predicted"], row["expected_value"])
 
-    report = compare(load_results(args.test), load_results(args.ood), args.models, value_matches)
+    test, ood = load_results(args.test), load_results(args.ood)
+    if args.rescore:
+        test = rescore_results(test, build_lookup(args.test_data), verifier.verify, args.models)
+        ood = rescore_results(ood, build_lookup(args.ood_data), verifier.verify, args.models)
+    report = compare(test, ood, args.models, value_matches)
     text = format_markdown(report)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

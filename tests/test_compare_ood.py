@@ -169,3 +169,80 @@ def test_format_markdown_with_one_model_has_no_pairs():
     test = results([True, False])
     text = format_markdown(compare(test, test, ["m0"], value_matches))
     assert "Comparación pareada" not in text
+
+
+# ---- rescoring stored generations with the current verifier -----------------------------
+class FakeResult:
+    def __init__(self, is_correct, predicted):
+        self.is_correct = is_correct
+        self.predicted = predicted
+
+
+def fake_verify(raw, expected, unit, aliases):
+    """Accepts any answer whose text contains the expected unit (what the old verifier missed)."""
+    return FakeResult(unit in raw, raw)
+
+
+def stored_row(question, raw, correct):
+    return {
+        "question": question,
+        "family": "infusion_inverse",
+        "raw": raw,
+        "expected_value": "5",
+        "is_correct": correct,
+        "predicted": None,
+        "has_valid_format": True,
+    }
+
+
+def test_rescore_rows_changes_the_verdict_and_keeps_the_old_one():
+    from rlm.compare_ood import rescore_rows
+
+    rows = [
+        stored_row("q1", "5 mcg/kg/min", False),  # wrongly rejected before
+        stored_row("q2", "5 mcg/min", False),  # genuinely wrong
+        stored_row("q3", "5 mL/h", True),
+    ]
+    lookup = {q: ("mcg/kg/min" if q != "q3" else "mL/h", []) for q in ("q1", "q2", "q3")}
+    new = rescore_rows(rows, lookup, fake_verify)
+    assert [r["is_correct"] for r in new] == [True, False, True]
+    assert [r["is_correct_original"] for r in new] == [False, False, True]
+    assert new[0]["predicted"] == "5 mcg/kg/min"
+    assert rows[0]["is_correct"] is False  # the input is not modified
+
+
+def test_rescore_rows_names_a_problem_missing_from_the_dataset():
+    from rlm.compare_ood import rescore_rows
+
+    with pytest.raises(KeyError, match="not found in the dataset"):
+        rescore_rows([stored_row("q1", "x", False)], {}, fake_verify)
+
+
+def test_rescore_results_skips_models_that_are_not_requested():
+    from rlm.compare_ood import rescore_results
+
+    results = {"a": {"rows": [stored_row("q1", "5 u", False)]}, "b": {"rows": []}}
+    out = rescore_results(results, {"q1": ("u", [])}, fake_verify, ["a"])
+    assert list(out) == ["a"]
+    assert out["a"]["rows"][0]["is_correct"] is True
+
+
+def test_report_shows_what_rescoring_changed():
+    from rlm.compare_ood import rescore_results
+
+    rows = [stored_row(f"q{i}", "5 u" if i < 4 else "5", False) for i in range(10)]
+    lookup = {f"q{i}": ("u", []) for i in range(10)}
+    rescored = rescore_results({"m": {"rows": rows}}, lookup, fake_verify, ["m"])
+    report = compare(rescored, rescored, ["m"], value_matches=lambda r: False)
+    summary = report["models"]["m"]["ood"]
+    assert summary["rescore"] == {"before": 0, "gained": 4, "lost": 0}
+    text = format_markdown(report)
+    assert "Efecto de volver a puntuar" in text
+    assert "| m | ood | 0/10 | 4/10 | 4 | 0 |" in text
+
+
+def test_report_without_rescoring_has_no_rescore_section():
+    test = results([True, False])
+    assert "Efecto de volver a puntuar" not in format_markdown(
+        compare(test, test, ["m0"], value_matches)
+    )

@@ -19,6 +19,7 @@ Completions may arrive as plain strings or as conversational messages
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Sequence
 
 # Full structure: a single think block followed by a single answer block, nothing else.
@@ -68,9 +69,10 @@ def extract_answer(text: str) -> str | None:
         return boxed[-1].strip()
     return None
 
+
 def _parse_raw_number(raw: str) -> str:
     """Turn a matched number token into a dot-decimal string, understanding the decimal comma.
- 
+
     ``"243,75"`` -> ``"243.75"`` (Spanish decimal comma) and ``"1,234,567"`` -> ``"1234567"``
     (thousands separators). A single comma followed by exactly three digits is read as a
     thousands separator (``"1,250"`` -> ``"1250"``, the GSM8K convention) unless the integer
@@ -88,6 +90,7 @@ def _parse_raw_number(raw: str) -> str:
     if len(tail) == 3 and head.lstrip("-") != "0":
         return raw.replace(",", "")  # 1,250 -> thousands
     return f"{head}.{tail}"  # 243,75 / 0,125 / 2,5 -> decimal comma
+
 
 def normalize_number(text: str) -> str | None:
     """Pull the last number out of a piece of text and normalise it.
@@ -122,12 +125,28 @@ UNIT_ALIASES = {
     "h": {"h", "hr", "hrs", "hour", "hours", "hora", "horas"},
     "gotas": {"drop", "drops", "gota", "gotas", "gtt"},
     "gotas/min": {
-        "gotas/min", "gotas/minuto", "gotas/minutos", "gotaspormin", "gotasporminuto",
-        "gtt/min", "gtt/minuto", "drops/min", "drops/minute", "dropspermin", "dropsperminute",
+        "gotas/min",
+        "gotas/minuto",
+        "gotas/minutos",
+        "gotaspormin",
+        "gotasporminuto",
+        "gtt/min",
+        "gtt/minuto",
+        "drops/min",
+        "drops/minute",
+        "dropspermin",
+        "dropsperminute",
     },
     "mL/h": {"ml/h", "ml/hr", "ml/hora", "ml/horas", "mlporhora"},
     "mL/min": {"ml/min", "ml/minuto", "ml/minute", "mlpormin", "mlporminuto"},
     "mg/mL": {"mg/ml", "mg/milliliter", "mg/millilitre"},
+    # Continuous-infusion dose. NFKC (see ``normalize_unit``) turns the micro sign U+00B5 into
+    # the Greek mu U+03BC, so a single spelling of the alias covers both.
+    "mcg/kg/min": {
+        "mcg/kg/min", "\u03bcg/kg/min", "ug/kg/min",
+        "mcg/kg/minuto", "\u03bcg/kg/minuto", "ug/kg/minuto",
+        "mcg/kg/minute", "\u03bcg/kg/minute", "ug/kg/minute",
+    },
 }
 
 
@@ -140,7 +159,8 @@ def normalize_unit(unit: str) -> str | None:
         "millilitros" -> "mL"
         "mg" -> "mg"
     """
-    cleaned = unit.strip().lower()
+    # NFKC unifies look-alike characters (micro sign U+00B5 -> Greek mu U+03BC, etc.).
+    cleaned = unicodedata.normalize("NFKC", unit).strip().lower()
     cleaned = re.sub(r"\s+", "", cleaned)
 
     for canonical, aliases in UNIT_ALIASES.items():
@@ -158,12 +178,14 @@ def extract_final_unit(text: str) -> str | None:
     units from being mistaken for the final answer's unit.
     """
     # Number followed by a unit: "95 mL", "95ml", "5 mg/mL", etc.
+    # \u00b5 and \u03bc are the micro sign and the Greek mu, both used for "micro" in practice.
     unit_pattern = (
-        r"(?:(?:gotas?|gtt|drops?)\s*(?:/|por|per)\s*min(?:uto|ute)?s?"
+        r"(?:(?:mcg|[\u00b5\u03bc]g|ug)\s*/\s*kg\s*/\s*(?:min|minuto|minute)s?"
+        r"|(?:gotas?|gtt|drops?)\s*(?:/|por|per)\s*min(?:uto|ute)?s?"
         r"|mg\s*/\s*ml"
         r"|ml\s*/\s*(?:hr|hora|horas|h)"
         r"|ml\s*/\s*(?:min|minuto|minute)"
-        r"|mL|ml|L|l|mg|mcg|μg|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
+        r"|mL|ml|L|l|mg|mcg|[\u00b5\u03bc]g|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
     )
 
     matches = list(
