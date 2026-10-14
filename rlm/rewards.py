@@ -69,10 +69,9 @@ def extract_answer(text: str) -> str | None:
         return boxed[-1].strip()
     return None
 
-
 def _parse_raw_number(raw: str) -> str:
     """Turn a matched number token into a dot-decimal string, understanding the decimal comma.
-
+ 
     ``"243,75"`` -> ``"243.75"`` (Spanish decimal comma) and ``"1,234,567"`` -> ``"1234567"``
     (thousands separators). A single comma followed by exactly three digits is read as a
     thousands separator (``"1,250"`` -> ``"1250"``, the GSM8K convention) unless the integer
@@ -90,7 +89,6 @@ def _parse_raw_number(raw: str) -> str:
     if len(tail) == 3 and head.lstrip("-") != "0":
         return raw.replace(",", "")  # 1,250 -> thousands
     return f"{head}.{tail}"  # 243,75 / 0,125 / 2,5 -> decimal comma
-
 
 def normalize_number(text: str) -> str | None:
     """Pull the last number out of a piece of text and normalise it.
@@ -125,17 +123,8 @@ UNIT_ALIASES = {
     "h": {"h", "hr", "hrs", "hour", "hours", "hora", "horas"},
     "gotas": {"drop", "drops", "gota", "gotas", "gtt"},
     "gotas/min": {
-        "gotas/min",
-        "gotas/minuto",
-        "gotas/minutos",
-        "gotaspormin",
-        "gotasporminuto",
-        "gtt/min",
-        "gtt/minuto",
-        "drops/min",
-        "drops/minute",
-        "dropspermin",
-        "dropsperminute",
+        "gotas/min", "gotas/minuto", "gotas/minutos", "gotaspormin", "gotasporminuto",
+        "gtt/min", "gtt/minuto", "drops/min", "drops/minute", "dropspermin", "dropsperminute",
     },
     "mL/h": {"ml/h", "ml/hr", "ml/hora", "ml/horas", "mlporhora"},
     "mL/min": {"ml/min", "ml/minuto", "ml/minute", "mlpormin", "mlporminuto"},

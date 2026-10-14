@@ -326,8 +326,9 @@ ni número de épocas; los elegidos son valores de partida razonables, no óptim
 
 Esta pérdida mide cuánto se parece el modelo al texto del profesor, no si sus respuestas son
 correctas. La comprobación real es el pass@1 sobre `rlm/data/test.jsonl` (y `test_ood.jsonl`)
-con `rlm/evaluate.py`, comparando el modelo base y el SFT. Está pendiente y es el siguiente
-paso, junto con revisar a mano unos cuantos fallos.
+con `rlm/evaluate.py`, comparando el modelo base y el SFT. Estaba pendiente cuando escribimos
+esta entrada; después se midió: 80,5 % en test (entrada del 2026-10-12) y 24,0 % en OOD (entrada
+del 2026-10-14).
 
 ### 2026-10-11 · Fase 1 · GRPO sin beta y con beta 0.04
 
@@ -648,5 +649,98 @@ No hay preguntas duplicadas en ninguna sección. Nota sobre `base`: sus 93 `no_u
 No encontramos evidencia de reward hacking en `grpo_sin_kl`. En los cinco fallos estudiados el modelo no obtiene reward por un atajo: son errores genuinos con reward 0. Además, el filtrado automático no detecta ninguno de los patrones que explotarían los huecos del reward: ninguna respuesta con varios números, sin unidad, con separador ambiguo o correcta sin formato válido.
 
 Limitaciones: el filtro solo detecta los huecos que identificamos en `rewards.py`; un hack distinto no se detectaría. 
+
+---
+
+### 2026-10-14 · Fase 1 · Test fuera de distribución (OOD): SFT frente a GRPO sin KL
+
+**Qué queríamos saber.** Cuánto empeoran el SFT y el mejor modelo de GRPO (sin KL, 8
+generaciones) cuando los problemas son de una familia que no aparece en train, y si GRPO se
+degrada menos que el SFT (la idea de "SFT memoriza, RL generaliza").
+
+**Qué hicimos.** Evaluamos los dos modelos con `rlm.evaluate` (generación greedy, máximo 1024
+tokens nuevos) sobre `rlm/data/test_ood.jsonl`: 100 problemas, 50 de `infusion` (de dosis en
+mcg/kg/min a velocidad en mL/h) y 50 de `infusion_inverse` (de velocidad a dosis en
+mcg/kg/min). Ninguna de las dos familias está en train ni en test, y los 100 problemas son de
+nivel 4 (train y test solo llegan al nivel 3). Lo comparamos con el pass@1 en test (200
+problemas) que ya teníamos en `reports/phase1_eval.json`.
+
+```bash
+uv run python -m rlm.evaluate --data rlm/data/test_ood.jsonl \
+  --adapters sft=rlm/weights/sft_lora grpo_sin_kl=rlm/weights/final_rlm_lora_sin_kl \
+  --out reports/phase1_eval_ood.json --history reports/phase1_pass1_ood.png
+uv run python -m rlm.compare_ood --rescore --models sft grpo_sin_kl
+```
+
+`rlm/compare_ood.py` calcula el pass@1 con intervalo de Wilson al 95 %, la caída entre test y OOD
+con intervalo de Newcombe, y compara los dos modelos sobre los mismos problemas con un test de
+signos exacto (solo cuentan los problemas que resuelve uno de los dos).
+
+**Un fallo del verificador que cambió el resultado.** La primera medida dio 20,0 % (SFT) y 27,0 %
+(GRPO), con `infusion_inverse` en 0/50 para los dos. Al revisar los casos de "valor correcto,
+unidad incorrecta" vimos que varios tenían la unidad escrita igual que la esperada
+(`0.31 mcg/kg/min`). La causa: `normalize_unit("mcg/kg/min")` devolvía `None` y
+`extract_final_unit` solo reconocía unidades simples, así que `units_equivalent` daba `False`
+para cualquier respuesta en esa unidad, fuera correcta o no. Lo arreglamos en `rlm/rewards.py`
+(17 líneas: reconoce `mcg/kg/min` con las grafías `mcg`, `µg`, `μg` y `ug`) y añadimos
+`tests/test_units.py`. Antes de darlo por bueno comprobamos que no cambia nada de lo anterior:
+de las 849 respuestas guardadas en test (los cinco modelos evaluados, con bloque `<answer>`),
+ninguna cambia de veredicto de unidad, y las unidades de train (`mL`, `mL/h`, `mg`,
+`gotas/min`, con sus alias) se normalizan igual que antes; por eso los modelos entrenados y sus
+resultados en test no se ven afectados. Las respuestas OOD ya generadas se puntuaron de nuevo
+con `--rescore`, sin volver a generar.
+
+**Qué pasó.** Con el verificador corregido:
+
+| Modelo | Test | OOD | Caída (puntos) |
+|---|---|---|---|
+| sft | 80,5 % [74,5; 85,4] (161/200) | 24,0 % [16,7; 33,2] (24/100) | +56,5 [45,5; 65,3] |
+| grpo_sin_kl | 89,5 % [84,5; 93,0] (179/200) | 30,0 % [21,9; 39,6] (30/100) | +59,5 [48,7; 68,3] |
+
+El repuntuado no cambia ningún veredicto en test (0 de 200 en ambos modelos) y en OOD pasan a
+correctas 4 respuestas del SFT y 3 de GRPO (ninguna pasa a incorrecta): los valores antes de
+corregir eran 20/100 y 27/100.
+
+| Familia (OOD) | n | sft | grpo_sin_kl |
+|---|---|---|---|
+| infusion | 50 | 20/50 (40,0 %) | 27/50 (54,0 %) |
+| infusion_inverse | 50 | 4/50 (8,0 %) | 3/50 (6,0 %) |
+
+| Tipo de resultado (OOD) | ok | valor correcto, unidad mal | valor mal | sin respuesta | formato válido |
+|---|---|---|---|---|---|
+| sft | 24 | 3 | 33 | 40 | 60,0 % |
+| grpo_sin_kl | 30 | 4 | 31 | 35 | 65,0 % |
+
+- Las 40 y 35 respuestas "sin respuesta" llegan todas al límite de 1024 tokens: no terminan.
+  En los ejemplos que leímos, el modelo se enreda ("¿Qué es el error?") y sigue razonando.
+- Las 7 respuestas con el valor correcto y la unidad mal son errores reales, no del verificador:
+  contestan en `µg/min` o `mcg/min`, sin el `/kg`.
+- De los fallos leídos a mano (seis), el SFT convierte mal ("5 mg es 5 mL") y en
+  `infusion_inverse` multiplica por el peso en vez de dividir; GRPO comete errores de
+  conversión (escribe 0,1 µg/kg/min como 0,001 mg/kg/min) o se queda sin tokens.
+- Comparación pareada en OOD: solo el SFT acierta 9 problemas, solo GRPO 15, ambos 15 y ninguno
+  61 (p = 0,307). En test eran 6 y 24 (p = 0,001).
+
+**Qué concluimos.**
+
+- Los dos modelos fallan mucho en la familia nueva: caen unos 57 y 60 puntos, y los intervalos
+  de las dos caídas se solapan casi por completo. No podemos decir que GRPO se degrade menos.
+- GRPO queda por encima del SFT también en OOD (30,0 % frente a 24,0 %), en la misma dirección
+  que en test, pero con 100 problemas la diferencia no es significativa (p = 0,307). La ventaja
+  fue clara en test (p = 0,001) y aquí no se sostiene. El experimento ni apoya ni descarta que
+  "RL generaliza": la evidencia es débil y ruidosa.
+- No podemos separar qué causa la caída, porque el OOD cambia varias cosas a la vez: la familia,
+  el sistema de unidades (mcg/kg/min no aparece en ningún problema de train, ni en las trazas
+  del SFT) y el nivel (todos son de nivel 4). Además, el 35-40 % de las respuestas no termina
+  en 1024 tokens, así que "no sabe" y "no acaba" se mezclan. Entre las respuestas que sí
+  terminan, aciertan 24/60 (SFT) y 30/65 (GRPO); es un dato descriptivo, no una comparación
+  limpia.
+- Limitaciones: 100 problemas; una sola generación greedy por problema; una sola semilla de
+  entrenamiento por modelo. `reports/phase1_eval_ood.json` guarda los veredictos del momento
+  de generar (20/100 y 27/100) y el gráfico `reports/phase1_pass1_ood.png` también; las cifras
+  corregidas son las de esta entrada y de `reports/ood_comparison.md`.
+- Siguientes pasos posibles, sin hacer: un OOD más suave con `--ood-mode weight` (mismas
+  familias, pesos de 2 a 9,9 kg) para ver una degradación que no sea total; repetir con más
+  tokens para separar los fallos por truncado; y más problemas por conjunto.
 
 ---
