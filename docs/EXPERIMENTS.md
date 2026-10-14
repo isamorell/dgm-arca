@@ -737,8 +737,9 @@ corregir eran 20/100 y 27/100.
   limpia.
 - Limitaciones: 100 problemas; una sola generación greedy por problema; una sola semilla de
   entrenamiento por modelo. `reports/phase1_eval_ood.json` guarda los veredictos del momento
-  de generar (20/100 y 27/100) y el gráfico `reports/phase1_pass1_ood.png` también; las cifras
-  corregidas son las de esta entrada y de `reports/ood_comparison.md`.
+  de generar (20/100 y 27/100), y el gráfico `phase1_pass1_ood.png` que genera `rlm.evaluate`
+  los refleja, pero ese gráfico está en el `.gitignore` y no se sube al repositorio. Las cifras
+  corregidas son las de esta entrada y las de `reports/ood_comparison.md`, que sí se suben.
 - Siguientes pasos posibles, sin hacer: un OOD más suave con `--ood-mode weight` (mismas
   familias, pesos de 2 a 9,9 kg) para ver una degradación que no sea total; repetir con más
   tokens para separar los fallos por truncado; y más problemas por conjunto.
