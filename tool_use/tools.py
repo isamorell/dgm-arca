@@ -32,10 +32,11 @@ SHEETS_DIR = Path("tool_use/outputs/sheets")
 def search_medication_cima(active_ingredient: str, max_results: int = 5) -> str:
     """Search the Spanish medicines agency (CIMA, AEMPS) for marketed presentations of a drug.
  
-    Returns, for each medicine, its name, strength or concentration (dose), pharmaceutical
-    form and routes of administration. Use it when you need to know which strength or
-    concentration is available, for example '10 mg/ml' for an intravenous solution. It
-    does not calculate anything: do the arithmetic with dose_calculator or convert_units.
+    Returns, for each medicine, its name, the amount of active ingredient per unit (dose,
+    for example '40 mg' per tablet or '20 mg' per ampoule), pharmaceutical form and routes
+    of administration. For injectables and oral solutions the concentration is usually
+    written in the name (for example '20mg/2ml'), so read it from there. It does not
+    calculate anything: do the arithmetic with dose_calculator or convert_units.
  
     Args:
         active_ingredient: Active ingredient name in Spanish, without dose or form,
