@@ -16,7 +16,12 @@ answers 501.
 
 from __future__ import annotations
 
+import re
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
 from api.schemas import ToolCallRecord, ToolsResponse
+from tool_use.parser import format_tool_result, parse_tool_calls
 from tool_use.registry import ToolRegistry
 from tool_use.tools import default_registry
 
@@ -46,7 +51,7 @@ class ToolLoop:
 
     def __init__(self, registry: ToolRegistry | None = None, model_id: str | None = None):
         self.registry = registry or default_registry()
-        self.model_id = model_id or "Qwen/Qwen3-1.7B"
+        self.model_id = model_id or os.environ.get("ARCA_RLM_ADAPTER") or "Qwen/Qwen3-1.7B"
         self.model = None
         self.tokenizer = None
 
@@ -57,11 +62,33 @@ class ToolLoop:
         ``apply_chat_template``. Using it instead of pasting JSON into the system prompt is
         allowed, but then explain in your README what the template actually renders.
         """
-        raise NotImplementedError
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_id, dtype=dtype, device_map=device
+        ).eval()
 
     def generate(self, messages: list[dict]) -> str:
         """Tu turno: step 2, one generation from the conversation so far."""
-        raise NotImplementedError
+        text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+
+        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        
+        with torch.no_grad():
+            out = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,  # TODO
+                do_sample=False,
+                pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+            )
+        new_tokens = out[0, inputs["input_ids"].shape[1] :]
+        return self.tokenizer.decode(new_tokens, skip_special_tokens=True)
 
     def run(self, query: str, max_turns: int = 5) -> ToolsResponse:
         """Tu turno: the loop.
@@ -87,7 +114,37 @@ class ToolLoop:
         Decide what to do with parse errors (``call.error``) and with tools that have
         ``requires_confirmation``. Both are observations the model should see.
         """
-        raise NotImplementedError
+        messages: list[dict] = [
+            {"role": "system", "content": build_system_prompt(self.registry)},
+            {"role": "user", "content": query},
+        ]
+        records: list[ToolCallRecord] = []
+
+        for turn in range(max_turns):
+            raw = self.generate(messages)
+            parsed = parse_tool_calls(raw)
+
+            if not parsed.has_tool_calls:
+                return ToolsResponse(answer=parsed.text, tool_calls=records, turns=turn + 1)
+            messages.append({"role": "assistant", "content": raw})
+
+            for call in parsed.tool_calls:
+                if call.error:
+                    pass  # TODO
+            else:
+                record = self.registry.call(call.name, call.arguments)
+            records.append(record)
+
+            payload = record.result if record.ok else record.error
+            content = format_tool_result(record.name, payload)
+            messages.append({"role": "tool", "name": record.name, "content": content})
+
+        return ToolsResponse(
+            answer=f"No pude completar la tarea en {max_turns} turnos con las herramientas disponibles.",
+            tool_calls=records,
+            turns=max_turns,
+            model=self.model_id,
+        )
 
 
 _loop: ToolLoop | None = None
@@ -98,7 +155,7 @@ def build_tool_loop() -> ToolLoop:
     global _loop
     if _loop is None:
         loop = ToolLoop()
-        loop.load()  # raises NotImplementedError until phase 2 is done
+        loop.load()
         _loop = loop
     return _loop
 
