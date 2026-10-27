@@ -910,3 +910,21 @@ sea un inyectable permitirá medir si esta limitación pesa en la práctica. Si 
 quedará documentado con esta entrada como causa probable.
 
 ---
+
+### 2026-10-27 · Fase 3 · Generación del corpus
+
+**Qué queríamos saber.** Queríamos generar un corpus con información técnica de unos 45/50 medicamentos, para que el modelo pudiese obtener información actualizada sobre los medicamentos disponibles, su posología y posibles incompatibilidades y precauciones. 
+
+**Qué hicimos.** Para obtener estos documentos, hemos realizado consultas a la API de CIMA y hemos generado los documentos ejecutando el fichero `rag/download_corpus.py`.
+
+Para más información sobre como recuperar el corpus, su contenido y la licencia, leer el documento:
+
+`rag/CORPUS_README.md`
+
+Este documento se encuentra fuera de la carpeta de corpus/ ya que los documentos de nuestro corpus son ficheros .md y no queríamos que el README.md se incorporase al corpus.
+
+**Qué pasó.** Hemos obtenido la información técnica relevante para nuestro caso de uso de 47 medicamentos. Estos se encuentran especificados en la variable DRUGS del fichero `rag/download_corpus.py`.
+
+**Qué concluimos.** Una vez tenemos el corpus, podemos generar el conjunto dorado que utilizaremos como ground truth para medir y comparar el rendimiento de las diferentes estrategias de chunking; además de poder calcular el Recall@k y MRR para los tres retrievers.
+
+---
