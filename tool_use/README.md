@@ -75,7 +75,10 @@ que requiera dos herramientas encadenadas, y miraré:
 |---|---|---|
 | `registry.py` | hecho | `@tool`, definiciones JSON Schema, validación y ejecución con captura de errores |
 | `parser.py` | hecho | Detecta `<think>` y uno o varios `<tool_call>` en la salida del modelo |
-| `tools.py` | ejemplo + tu turno | `get_weather` y `calculator`; las vuestras van aquí |
-| `executor.py` | tu turno | El flujo de cinco pasos; detrás de `/tools` |
-| `evaluate.py` | hecho | Métricas de selección y argumentos sobre el banco de pruebas |
-| `bench/` | vuestro | Casos de prueba (`example_cases.jsonl` muestra el formato) |
+| `tools.py` | hecho | Cuatro herramientas del asistente de enfermería: `search_medication_cima` (API real de CIMA), `convert_units` y `dose_calculator` (cálculo), `create_preparation_sheet` (PDF, pide confirmación) |
+| `executor.py` | hecho | El flujo de cinco pasos con varios turnos y llamadas paralelas; detrás de `/tools`. Carga el modelo base: no aplica el adaptador de la fase 1 |
+| `evaluate.py` | hecho | Selección, argumentos, respuesta final y comparación con y sin herramientas; `--adapter`, `--thinking`, `--conditions` y `--rescore` |
+| `bench/` | hecho | `cases.jsonl`: 30 casos, 6 de ellos sin herramienta |
+
+Los resultados del banco y su análisis están en [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md)
+(entradas de la fase 2).

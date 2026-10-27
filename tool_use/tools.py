@@ -202,7 +202,6 @@ def create_preparation_sheet(
     return str(path)
 
 def default_registry() -> ToolRegistry:
-    """The registry the executor and the agent use. Register your tools here."""
-    # Tu turno: registry.register(my_domain_api, my_domain_compute, my_domain_action)
+    """The registry the executor and the agent use: the four tools of the nursing assistant."""
     registry = ToolRegistry().register(search_medication_cima, convert_units, dose_calculator, create_preparation_sheet)
     return registry

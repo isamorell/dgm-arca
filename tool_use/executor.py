@@ -10,8 +10,7 @@
 Steps 2-4 repeat until the model answers or ``max_turns`` is reached (multi-step tool use).
 Several <tool_call> blocks in one generation are executed in the same turn (parallel calls).
 
-``run_tool_loop`` is what ``POST /tools`` calls. Until you implement it, the endpoint
-answers 501.
+``run_tool_loop`` is what ``POST /tools`` calls.
 """
 
 from __future__ import annotations
@@ -87,11 +86,12 @@ class ToolLoop:
         snapshot_download(repo, local_dir=adapter)
 
     def load(self) -> None:
-        """Tu turno: load tokenizer and model (bf16 on GPU).
+        """Load the tokenizer and the model (bf16 on GPU).
 
-        Tip: Qwen's chat template accepts ``tools=registry.definitions()`` directly in
-        ``apply_chat_template``. Using it instead of pasting JSON into the system prompt is
-        allowed, but then explain in your README what the template actually renders.
+        Only the base model is loaded. The tool definitions go in the system prompt
+        (``build_system_prompt``), not through the chat template. The LoRA adapter of phase 1
+        is not applied here: ``ARCA_RLM_ADAPTER`` is only checked (and downloaded from the Hub
+        if it is missing). ``tool_use/evaluate.py --adapter`` applies it to evaluate it.
         """
         if self._check_env_adapter:
             self._ensure_env_adapter()
@@ -103,7 +103,7 @@ class ToolLoop:
         ).eval()
 
     def generate(self, messages: list[dict]) -> str:
-        """Tu turno: step 2, one generation from the conversation so far."""
+        """Step 2: one greedy generation from the conversation so far, with thinking disabled."""
         text = self.tokenizer.apply_chat_template(
             messages,
             tokenize=False,
@@ -124,28 +124,12 @@ class ToolLoop:
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True)
 
     def run(self, query: str, max_turns: int = 5) -> ToolsResponse:
-        """Tu turno: the loop.
+        """Steps 2-5: generate, parse, execute and feed the results back until the model answers.
 
-        Sketch::
-
-            messages = [system, user]
-            records: list[ToolCallRecord] = []
-            for turn in range(max_turns):
-                raw = self.generate(messages)
-                parsed = parse_tool_calls(raw)
-                if not parsed.has_tool_calls:
-                    return ToolsResponse(answer=parsed.text, tool_calls=records, turns=turn + 1)
-                messages.append({"role": "assistant", "content": raw})
-                for call in parsed.tool_calls:
-                    record = self.registry.call(call.name, call.arguments)   # step 3
-                    records.append(record)
-                    payload = record.result if record.ok else record.error
-                    content = format_tool_result(record.name, payload)
-                    messages.append({"role": "tool", "name": record.name, "content": content})
-            # out of turns: return what you have, flag it
-
-        Decide what to do with parse errors (``call.error``) and with tools that have
-        ``requires_confirmation``. Both are observations the model should see.
+        Stops when a generation has no valid ``<tool_call>`` or after ``max_turns`` rounds.
+        Parse errors (``call.error``), validation errors and tools that require confirmation
+        (when ``allow_side_effects`` is false) are not raised: they are recorded in
+        ``tool_calls`` and sent back to the model as ``tool`` messages, so it can correct itself.
         """
         messages: list[dict] = [
             {"role": "system", "content": build_system_prompt(self.registry)},
@@ -158,7 +142,12 @@ class ToolLoop:
             parsed = parse_tool_calls(raw)
 
             if not parsed.has_tool_calls:
-                return ToolsResponse(answer=parsed.text or raw, tool_calls=records, turns=turn + 1)
+                return ToolsResponse(
+                    answer=parsed.text or raw,
+                    tool_calls=records,
+                    turns=turn + 1,
+                    model=self.model_id or "",
+                )
             messages.append({"role": "assistant", "content": raw})
 
             for call in parsed.tool_calls:
