@@ -39,6 +39,8 @@ You should decide if you want to call a tool. If so, your call must be formatted
 </tool_call>
 You may emit several <tool_call> blocks in one message if the calls are independent.
 After the tool calls are executed, you will receive their results and can continue.
+Some tasks need several tools in sequence. After each result, check whether the user's request
+is fully solved; if not, call the next tool. Answer only when every part of the request is done.
 When you have everything you need, answer the user directly without calling tools."""
 
 

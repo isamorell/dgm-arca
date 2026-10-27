@@ -229,3 +229,9 @@ def test_response_reports_the_model_that_answered(monkeypatch):
     assert r.model == "Qwen/Qwen3-0.6B"
     monkeypatch.delenv("ARCA_RLM_BASE_MODEL")
     assert make_loop(monkeypatch, ["Hola."]).run("x").model == ""
+
+
+def test_system_prompt_asks_to_keep_calling_tools_until_the_request_is_solved():
+    prompt = build_system_prompt(ToolRegistry().register(add))
+    assert "call the next tool" in prompt
+    assert "Answer only when every part of the request is done" in prompt
