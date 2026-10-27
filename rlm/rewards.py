@@ -174,7 +174,7 @@ def extract_final_unit(text: str) -> str | None:
         r"|mg\s*/\s*ml"
         r"|ml\s*/\s*(?:hr|hora|horas|h)"
         r"|ml\s*/\s*(?:min|minuto|minute)"
-        r"|mL|ml|L|l|mg|mcg|[\u00b5\u03bc]g|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
+        r"|mL|ml|cc(?!\s*/)|L|l|mg|mcg|[\u00b5\u03bc]g|ug|kg|g|min|h|hr|hrs|drops?|gotas?|gtt)"
     )
 
     matches = list(
