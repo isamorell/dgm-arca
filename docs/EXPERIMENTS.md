@@ -1277,3 +1277,72 @@ ocultar errores de unidades en un dominio clínico; quitar `'h'` y `'mg/kg/h'` d
 unidades de `from_unit`.
 
 ---
+
+### 2026-10-27 · Fase 2 · Una frase en el prompt para los encadenados (multi-step)
+
+**Qué queríamos saber.** Si se puede arreglar con el prompt de sistema el fallo más repetido del
+banco: ningún modelo completa los casos encadenados (c22, c23 y c24). Lo vimos también al probar
+`POST /tools` a mano: ante "busca la furosemida inyectable en CIMA y dime cuántos mL necesito para
+dar 40 mg", el modelo busca en CIMA, recibe un comprimido oral de 40 mg y contesta "40 mL" sin llamar a
+`dose_calculator`. La hipótesis era que el modelo se da por satisfecho tras el primer resultado y que
+bastaba pedirle que siga hasta resolver toda la petición.
+
+**Qué hicimos.** Un único cambio en `SYSTEM_PROMPT_TEMPLATE` de `tool_use/executor.py`, en la rama
+`exp_prompt_multistep` (no mergeada), sin ejemplos concretos para no volver a solapar con casos del
+banco:
+
+> Some tasks need several tools in sequence. After each result, check whether the user's request
+> is fully solved; if not, call the next tool. Answer only when every part of the request is done.
+
+Las descripciones de las herramientas son las originales (con ejemplos), así que la comparación
+justa es con las primeras ejecuciones. Solo la condición con herramientas, mismos parámetros que
+antes, una ejecución voraz por modelo:
+
+```bash
+uv run python -m tool_use.evaluate --conditions tools \
+  --out reports/phase2_eval_qwen3-0.6b_prompt.json
+uv run python -m tool_use.evaluate --conditions tools --adapter raquelfes11/dgm-arca-sft-lora \
+  --thinking --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft_prompt.json
+```
+
+**Qué pasó.**
+
+| Solo con herramientas | Qwen3-0.6B, sin la frase | Qwen3-0.6B, con la frase | 0.6B + SFT, sin la frase | 0.6B + SFT, con la frase |
+|---|---|---|---|---|
+| Selección (30) | 73,3 % (22) | 80,0 % (24) | 60,0 % (18) | 63,3 % (19) |
+| Argumentos, estricto | 63,3 % (19) | 70,0 % (21) | 50,0 % (15) | 53,3 % (16) |
+| Llamadas omitidas / herramienta equivocada (24) | 2 / 6 | 0 / 6 | 11 / 1 | 9 / 2 |
+| **Secuencia correcta en los 3 encadenados** | **0** | **0** | **0** | **0** |
+| Encadenados, selección / argumentos (3) | 3 / 2 | 3 / 2 | 1 / 0 | 1 / 0 |
+| Respuesta final (15) | 40,0 % (6) | 33,3 % (5) | 73,3 % (11) | 73,3 % (11) |
+| Llamadas totales / con error | 23 / 4 | 31 / 9 | 15 / 5 | 17 / 5 |
+
+- **Los encadenados no mejoran con ningún modelo.** Con el 0.6B, c22 se sigue parando tras CIMA y
+  contesta "40 mL"; c23 hace dos `convert_units` seguidos, el segundo de `mL` a `mL`, y acaba con
+  "500 mL"; c24 llama a `create_preparation_sheet` justo después del cálculo y, al no poder
+  ejecutarla, pide confirmación sin dar la dosis (antes sí la daba: pierde la respuesta correcta).
+  Con el SFT, c22 y c24 no hacen ninguna llamada: razonan que van a usar la herramienta y terminan
+  sin cerrar el `</think>` y sin hacerla; c23 es idéntico al de antes, con la llamada a la hoja
+  que nadie había pedido.
+- **Lo que sube no tiene que ver con encadenar.** Con el 0.6B, c08 y c09 (conversiones sencillas)
+  ahora llaman bien a `convert_units`, lo que explica el +2 en selección y en argumentos. Con el
+  SFT, c12 llama a `dose_calculator`, c06 consulta CIMA y c02 deja de hacerlo: cambios de un caso
+  que se compensan, con la respuesta final igual (11 de 15).
+- **Con el 0.6B base, el coste es real.** Las llamadas pasan de 23 a 31 y las erróneas de 4 a 9:
+  en c14 repite 4 veces la misma llamada fallida y en c18 3 veces. La respuesta final baja de 6 a 5
+  por c24.
+
+**Qué concluimos.** Es un resultado negativo: pedir en el prompt que se siga llamando a herramientas
+no mejora los encadenados con ninguno de los dos modelos. El fallo no es que el modelo se pare antes
+de tiempo, sino que no sabe qué herramienta toca después: elige `convert_units` o repite la
+anterior, o ni siquiera llama a la primera. Eso apunta a la falta de entrenamiento en llamadas
+encadenadas, no al prompt, y refuerza el apartado "para ir más allá" (SFT con trazas de varias
+herramientas). El cambio no se lleva a `main`: la rama `exp_prompt_multistep` queda como registro.
+El resultado también explica por qué el endpoint `/tools` falla en peticiones encadenadas con el
+modelo actual, algo que hay que tener presente al decidir qué modelo sirve.
+
+Límites: una sola frase, redactada en inglés y sin variantes (por ejemplo, una más explícita sobre
+el paso siguiente); una sola ejecución voraz por modelo con 30 casos; solo los modelos de 0.6B (el
+1.7B no se probó); y con solo 3 casos encadenados, cualquier mejora pequeña no se habría detectado.
+
+---
