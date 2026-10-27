@@ -12,11 +12,17 @@ Several <tool_call> blocks in one generation are executed in the same turn (para
 
 ``run_tool_loop`` is what ``POST /tools`` calls. Until you implement it, the endpoint
 answers 501.
+
+Configuration (environment variables):
+
+* ``ARCA_TOOLS_MODEL``               model id (default ``Qwen/Qwen3-1.7B``)
+* ``ARCA_TOOLS_ALLOW_SIDE_EFFECTS``  1 = run tools with ``requires_confirmation`` and flag
+                                     them; 0 = block them (default 1)
 """
 
 from __future__ import annotations
 
-import re
+import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -49,11 +55,16 @@ def build_system_prompt(registry: ToolRegistry) -> str:
 class ToolLoop:
     """Holds the model and the registry and runs the five-step workflow."""
 
-    def __init__(self, registry: ToolRegistry | None = None, model_id: str | None = None):
+    def __init__(self, registry: ToolRegistry | None = None, model_id: str | None = None, allow_side_effects: bool | None = None, max_new_tokens: int = 1024):
         self.registry = registry or default_registry()
-        self.model_id = model_id or os.environ.get("ARCA_RLM_ADAPTER") or "Qwen/Qwen3-1.7B"
+        self.model_id = model_id or os.environ.get("ARCA_TOOLS_MODEL") or "Qwen/Qwen3-1.7B"
         self.model = None
         self.tokenizer = None
+
+        if allow_side_effects is None:
+            allow_side_effects = os.environ.get("ARCA_TOOLS_ALLOW_SIDE_EFFECTS", "1") == "1"
+        self.allow_side_effects = allow_side_effects
+        self.max_new_tokens = max_new_tokens
 
     def load(self) -> None:
         """Tu turno: load tokenizer and model (bf16 on GPU).
@@ -83,7 +94,7 @@ class ToolLoop:
         with torch.no_grad():
             out = self.model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,  # TODO
+                max_new_tokens=self.max_new_tokens,
                 do_sample=False,
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
             )
@@ -125,22 +136,33 @@ class ToolLoop:
             parsed = parse_tool_calls(raw)
 
             if not parsed.has_tool_calls:
-                return ToolsResponse(answer=parsed.text, tool_calls=records, turns=turn + 1)
+                return ToolsResponse(answer=parsed.text or raw, tool_calls=records, turns=turn + 1)
             messages.append({"role": "assistant", "content": raw})
 
             for call in parsed.tool_calls:
                 if call.error:
-                    pass  # TODO
-            else:
-                record = self.registry.call(call.name, call.arguments)
-            records.append(record)
+                    return ToolCallRecord(name=call.name or "unknown", arguments=call.arguments, ok=False, error=f"invalid tool call: {call.error}")
 
-            payload = record.result if record.ok else record.error
-            content = format_tool_result(record.name, payload)
-            messages.append({"role": "tool", "name": record.name, "content": content})
+                tool = self.registry.tools.get(call.name)
+                if tool is not None and tool.requires_confirmation and not self.allow_side_effects:
+                    return ToolCallRecord(
+                        name=call.name,
+                        arguments=call.arguments,
+                        ok=False,
+                        requires_confirmation=True,
+                        error="this tool has side effects and requires user confirmation; "
+                        "it was NOT executed. Ask the user to confirm.",
+                    )
+
+                record = self.registry.call(call.name, call.arguments)
+                records.append(record)
+
+                payload = record.result if record.ok else record.error
+                content = format_tool_result(record.name, payload)
+                messages.append({"role": "tool", "name": record.name, "content": content})
 
         return ToolsResponse(
-            answer=f"No pude completar la tarea en {max_turns} turnos con las herramientas disponibles.",
+            answer=f"No pude completar la tarea en {max_turns} turnos.",
             tool_calls=records,
             turns=max_turns,
             model=self.model_id,
