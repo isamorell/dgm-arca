@@ -910,3 +910,137 @@ sea un inyectable permitirá medir si esta limitación pesa en la práctica. Si 
 quedará documentado con esta entrada como causa probable.
 
 ---
+
+### 2026-10-27 · Fase 2 · Banco de pruebas de herramientas: Qwen3-0.6B y Qwen3-1.7B, con y sin herramientas
+
+**Qué queríamos saber.** Tres cosas: si el modelo elige la herramienta correcta y le pasa los
+argumentos correctos, si las herramientas mejoran la respuesta final frente a no tenerlas, y dónde
+falla y por qué. La hipótesis de la entrada "Una calculadora de dosis" era que, con
+`dose_calculator`, desaparecerían los errores aritméticos de la fase 1.
+
+**Qué hicimos.** Un banco de 30 casos en español (`tool_use/bench/cases.jsonl`), escrito y
+revisado a mano **antes** de ejecutar y sin tocar ningún caso después de ver resultados:
+
+| Tipo | Casos | Qué se espera |
+|---|---|---|
+| Consulta CIMA | 6 | `search_medication_cima` (uno con paracetamol IV, la limitación anotada arriba) |
+| Conversión | 5 | `convert_units` |
+| Cálculo de dosis | 7 | `dose_calculator` |
+| Hoja PDF | 3 | `create_preparation_sheet` |
+| Encadenados | 3 | varias herramientas en orden (CIMA y cálculo, conversión y cálculo, cálculo y hoja) |
+| Sin herramienta | 6 | ninguna (teoría, saludo, un fármaco mencionado sin pedir datos de CIMA) |
+
+Métricas (`tool_use/evaluate.py`):
+
+- **Selección:** la primera llamada es la herramienta esperada (o no hay llamada si no hace falta).
+- **Argumentos:** se comparan por significado: las expresiones por su valor (`15*70` es `70 * 15`),
+  las unidades por conversión (`µg` es `mcg`) y los argumentos opcionales en su valor por defecto
+  cuentan como puestos. Damos dos cifras: **estricta** y **sin contar los opcionales** que el caso
+  no fija (`max_results`, `decimals`), porque elegir 10 resultados en vez de 5 no es una llamada
+  incorrecta. El campo `steps` de la hoja solo debe existir.
+- **Respuesta final:** el texto contiene el número esperado. Solo existe en los 15 casos con
+  resultado numérico (conversión, cálculo y 3 encadenados). Es una heurística: no distingue un
+  número correcto en una frase equivocada.
+- **Con y sin herramientas:** mismo modelo y mismos casos. Sin herramientas cambia el prompt de
+  sistema (una instrucción neutra) y no hay definiciones.
+
+Modelos: `Qwen/Qwen3-0.6B` y `Qwen/Qwen3-1.7B` tal cual, sin nuestro SFT ni GRPO. Decodificación
+voraz, `enable_thinking=False`, 1024 tokens máximo, 5 turnos, una sola ejecución. La hoja PDF no
+se ejecutó (`allow_side_effects=False`): el modelo recibe que requiere confirmación.
+
+```bash
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-0.6B --out reports/phase2_eval_qwen3-0.6b.json
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-1.7B --out reports/phase2_eval_qwen3-1.7b.json
+uv run python -m tool_use.evaluate --rescore reports/phase2_eval_qwen3-0.6b.json   # sin modelo
+```
+
+**Una corrección de la medición.** La primera puntuación aceptaba un número dentro del 0,5 %, y
+daba por buenas las respuestas "41,75" y "41,76" para 41,7 (c18): son errores aritméticos reales.
+Bajamos la tolerancia (1e-4 relativa y 0,01 absoluta, de modo que 1,6667 sigue valiendo para 1,67) y
+volvimos a puntuar los dos ficheros con `--rescore`. Solo cambió esa respuesta en la condición sin
+herramientas de cada modelo. Los JSON de `reports/` ya llevan las cifras corregidas; el
+comportamiento crudo del modelo (llamadas y respuestas) no se tocó.
+
+**Qué pasó.**
+
+| | Qwen3-0.6B | Qwen3-1.7B |
+|---|---|---|
+| Selección de herramienta (30 casos) | 73,3 % (22) | 96,7 % (29) |
+| Argumentos, estricto | 63,3 % (19) | 70,0 % (21) |
+| Argumentos, sin contar opcionales | 70,0 % (21) | 86,7 % (26) |
+| Llamadas innecesarias (6 casos sin herramienta) | 0 | 0 |
+| Llamadas omitidas / herramienta equivocada (24 casos) | 2 / 6 | 0 / 1 |
+| Secuencia completa en los 3 encadenados | 0 | 0 |
+| Respuesta final correcta **con** herramientas (15 casos) | 40,0 % (6) · IC 19,8-64,3 | 60,0 % (9) · IC 35,7-80,2 |
+| Respuesta final correcta **sin** herramientas (15 casos) | 33,3 % (5) · IC 15,2-58,3 | 73,3 % (11) · IC 48,0-89,1 |
+
+Selección y argumentos por categoría (acierto de herramienta / argumentos estricto):
+
+| Categoría | 0.6B | 1.7B |
+|---|---|---|
+| CIMA (6) | 6 / 5 | 6 / 2 |
+| Conversión (5) | 3 / 2 | 5 / 5 |
+| Cálculo (7) | 1 / 1 | 6 / 3 |
+| Hoja PDF (3) | 3 / 3 | 3 / 3 |
+| Encadenados (3) | 3 / 2 | 3 / 2 |
+| Sin herramienta (6) | 6 / 6 | 6 / 6 |
+
+Qué falla, con ejemplos (ids de `cases.jsonl`):
+
+1. **Confunde `convert_units` con `dose_calculator`.** El 0.6B usa `convert_units` en los 6 casos
+   de cálculo que fallan (c13-c18) con argumentos sin sentido: `value: "1000 mg"` (texto),
+   `mg a mL` (error de tipo de unidad) o `500 L a mL`. El 1.7B casi lo evita (6 de 7), pero lo
+   repite en c15 (`mL a mL/h`) y en el segundo paso de c23 (`mcg a mL`).
+2. **El fallo está en plantear la expresión, no en calcularla.** El 1.7B llama a
+   `dose_calculator`, que calcula exacto, pero con la expresión mal planteada: multiplica en vez
+   de dividir (c14, `0.5 * 12 * 2.5`), olvida pasar a minutos (c16, `500 / 8`) o no multiplica por
+   los mL de la ampolla (c17, `40 / 20`). En c13 la herramienta devuelve `100.0` y el modelo
+   contesta "1000 mL", en inglés.
+3. **Tras un error de herramienta, nunca prueba otra herramienta.** De 6 llamadas con error
+   (4 del 0.6B y 2 del 1.7B), ninguna va seguida de una llamada correcta. El 1.7B se recupera
+   calculando él mismo y acierta (c15, c23); el 0.6B se rinde (c13, c14, c17), calcula mal solo
+   (c18) o da por buena una salida absurda: 500000 mL/h en c15 y c16.
+4. **CIMA: elige bien y lee regular.** Con paracetamol IV (c05) la lista es toda oral. El 0.6B
+   responde que la presentación intravenosa es un comprimido efervescente; el 1.7B nota que son
+   orales ("no se menciona una presentación intravenosa directamente"). En c22 ambos piden
+   `max_results: 1`, reciben una sola presentación oral de furosemida y nunca llegan a calcular.
+   El 1.7B elige `max_results` distinto cada vez (10, 5, 3, 1), y por eso la cifra estricta de
+   CIMA baja a 2/6 aunque las 6 llamadas son razonables.
+5. **Ningún encadenado se completa.** c22 se para tras CIMA; en c23 el 0.6B llama a CIMA en vez de
+   a la calculadora y el 1.7B repite `convert_units` (`mcg a mL`); en c24 el 0.6B se para tras el
+   primer cálculo y el 1.7B se salta el cálculo del volumen y se inventa "500 mg, 10 mL" (esperado:
+   12,5 mL; la hoja no se ejecutó).
+6. **Con y sin herramientas.** Por categoría, las herramientas ayudan en conversión (0.6B: 4/5 frente
+   a 2/5; 1.7B: 5/5 frente a 4/5) y **perjudican en cálculo** (0.6B: 1/7 frente a 3/7; 1.7B: 3/7
+   frente a 5/7). Caso a caso, el 1.7B gana con herramientas en 2 casos (c11, una conversión que
+   el texto no resuelve, y c18, donde la calculadora da 41,7 y sin ella 41,76) y pierde en 4
+   (c13, c14, c17, c24). El 0.6B gana en 4 (c08, c11, c12, c24) y pierde en 3 (c13, c14, c15); en
+   c08 no llamó a ninguna herramienta, así que esa diferencia viene del prompt y no de la
+   herramienta. Un test de signos da p = 0,69 (1.7B) y p = 1,0 (0.6B): no hay evidencia de efecto.
+
+**Qué concluimos.**
+
+- **Tamaño.** El paso de 0.6B a 1.7B mejora mucho la selección (73 % a 97 %) y bastante los
+  argumentos sin contar opcionales (70 % a 87 %), pero la respuesta final con herramientas sube
+  menos de lo que sube sin ellas. A 1.7B, usar herramientas no mejora la respuesta final en nuestro
+  banco (60 % frente a 73 %, con intervalos que se solapan).
+- **La hipótesis de la calculadora se cumple solo a medias.** Cuando el modelo llama a
+  `dose_calculator`, el número es exacto (c18), pero los errores que quedan son de planteamiento,
+  que una calculadora no corrige. Hipótesis, sin comprobar: con `enable_thinking=False` el modelo
+  escribe la expresión en el primer token, sin el razonamiento paso a paso con el que acierta
+  cuando responde solo (sin herramientas explica "volumen = dosis / concentración" y sustituye).
+- **La descripción de `convert_units` puede estar atrayendo al modelo.** Dice expresamente que no
+  convierte "mg a mL" y los errores del 0.6B y de c15/c23 van justo ahí. Es una hipótesis: no
+  hemos cambiado la descripción ni repetido la prueba.
+- **Límites.** 30 casos y solo 15 con respuesta numérica: los intervalos son anchos y las
+  diferencias entre condiciones no son significativas. Los casos de cálculo son sencillos (el 1.7B
+  sin herramientas acierta 5 de 7), así que la calculadora tiene poco margen. Las respuestas de
+  CIMA y las hojas no se puntúan en el texto final. Una sola ejecución voraz por modelo, con la
+  hoja sin ejecutar. Son los modelos Qwen3 tal cual: si el profesor pide el nuestro, habría que
+  repetir con `--model-id`.
+- **Por probar (no hecho).** Reescribir la descripción de `convert_units` y repetir solo los casos
+  de cálculo; devolver en los errores de `convert_units` una pista ("para multiplicar o dividir
+  usa `dose_calculator`"); dejar razonar al modelo antes de llamar; casos de cálculo más difíciles,
+  como los de la fase 1.
+
+---

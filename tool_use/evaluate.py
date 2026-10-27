@@ -56,8 +56,10 @@ NO_TOOLS_SYSTEM_PROMPT = (
     "Answer the question directly."
 )
 
-# Tolerance when a number in the final answer is compared with the expected one.
-ANSWER_REL_TOL = 0.005
+# Tolerance when a number in the final answer is compared with the expected one. It must accept
+# the unrounded value (1.6667 for an expected 1.67) but not an arithmetic slip: a relative
+# tolerance of 0.5 % accepted 41.75 and 41.76 as 41.7, and those answers are wrong.
+ANSWER_REL_TOL = 1e-4
 ANSWER_ABS_TOL = 0.01
 
 
@@ -162,13 +164,18 @@ def arguments_match(
     got: dict[str, Any],
     expected: dict[str, Any],
     free_text_args: tuple[str, ...] | list[str] = (),
+    ignore_optional: bool = False,
 ) -> bool:
     """Do the arguments of a call match the expected ones?
 
     Parameters left at their default are filled in on both sides before comparing, and the
-    ``free_text_args`` only need to be present and non-empty.
+    ``free_text_args`` only need to be present and non-empty. With ``ignore_optional``, an
+    optional parameter the expected call does not mention (``max_results``, ``decimals``) may
+    take any value: choosing 10 results instead of 5 is not a wrong call.
     """
     defaults = _defaults(tool_name)
+    if ignore_optional:
+        got = {k: v for k, v in got.items() if not (k in defaults and k not in expected)}
     got_full, expected_full = {**defaults, **got}, {**defaults, **expected}
     if set(got_full) != set(expected_full):
         return False
@@ -235,15 +242,27 @@ def score_case(case: dict[str, Any], tool_calls: list[dict[str, Any]]) -> dict[s
     first = tool_calls[0] if tool_calls else None
     if not case.get("needs_tool", True):
         selection_ok = first is None
-        return {"selection_ok": selection_ok, "arguments_ok": selection_ok}
+        return {
+            "selection_ok": selection_ok,
+            "arguments_ok": selection_ok,
+            "arguments_lenient_ok": selection_ok,
+        }
     selection_ok = first is not None and first["name"] == case["expected_tool"]
-    arguments_ok = selection_ok and arguments_match(
-        case["expected_tool"],
-        first["arguments"],
-        case.get("expected_arguments", {}),
-        case.get("free_text_args", ()),
-    )
-    scores = {"selection_ok": selection_ok, "arguments_ok": arguments_ok}
+
+    def matches(ignore_optional: bool) -> bool:
+        return selection_ok and arguments_match(
+            case["expected_tool"],
+            first["arguments"],
+            case.get("expected_arguments", {}),
+            case.get("free_text_args", ()),
+            ignore_optional=ignore_optional,
+        )
+
+    scores = {
+        "selection_ok": selection_ok,
+        "arguments_ok": matches(False),
+        "arguments_lenient_ok": matches(True),
+    }
     if case.get("expected_sequence"):
         scores["sequence_ok"] = [c["name"] for c in tool_calls] == case["expected_sequence"]
     return scores
@@ -286,6 +305,10 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "argument_accuracy": sum(r["arguments_ok"] for r in rows) / n,
         "n_cases": len(rows),
     }
+    if all("arguments_lenient_ok" in r for r in rows):
+        out["argument_accuracy_ignoring_optional"] = (
+            sum(r["arguments_lenient_ok"] for r in rows) / n
+        )
     needs = [r for r in rows if r.get("needs_tool", True)]
     free = [r for r in rows if not r.get("needs_tool", True)]
     if free:
@@ -347,6 +370,33 @@ def compare_conditions(
     }
 
 
+def build_summary(rows: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """Summary of a run: each condition on its own and, with both, the comparison."""
+    summary: dict[str, Any] = {}
+    if "tools" in rows:
+        summary["tools"] = summarise(rows["tools"])
+    if "no_tools" in rows:
+        summary["no_tools"] = summarise_answers(rows["no_tools"])
+    if "tools" in rows and "no_tools" in rows:
+        summary["comparison"] = compare_conditions(rows["tools"], rows["no_tools"])
+    return summary
+
+
+def rescore(data: dict[str, Any]) -> dict[str, Any]:
+    """Recompute every score of a saved run from its stored calls and answers (no model needed).
+
+    Use it when the scoring changes: the raw behaviour of the model (``tool_calls`` and
+    ``answer``) is kept in the file, only the derived fields are rewritten.
+    """
+    for row in data["rows"].get("tools", []):
+        row.update(score_case(row, row["tool_calls"]))
+        row["answer_ok"] = answer_ok(row, row["answer"])
+    for row in data["rows"].get("no_tools", []):
+        row["answer_ok"] = answer_ok(row, row["answer"])
+    data["summary"] = build_summary(data["rows"])
+    return data
+
+
 # ---------------------------------------------------------------------------- running
 
 
@@ -386,7 +436,14 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--bench", default="tool_use/bench/cases.jsonl")
-    parser.add_argument("--out", default="reports/phase2_eval.json")
+    parser.add_argument(
+        "--out", default=None, help="Output JSON (default: reports/phase2_eval.json)."
+    )
+    parser.add_argument(
+        "--rescore",
+        metavar="JSON",
+        help="Recompute the scores of a saved run with the current scoring, without a model.",
+    )
     parser.add_argument("--max-turns", type=int, default=5)
     parser.add_argument(
         "--model-id",
@@ -407,6 +464,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.rescore:
+        data = rescore(json.loads(Path(args.rescore).read_text(encoding="utf-8")))
+        print(json.dumps(data["summary"], indent=2, ensure_ascii=False))
+        Path(args.out or args.rescore).write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        return
+
     from dotenv import load_dotenv
 
     load_dotenv()  # each teammate defines their own .env (see .env.example)
@@ -420,25 +483,21 @@ def main() -> None:
     cases = load_bench(args.bench)
 
     rows: dict[str, list[dict[str, Any]]] = {}
-    summary: dict[str, Any] = {}
     if "tools" in args.conditions:
         rows["tools"] = []
         for case in cases:
             rows["tools"].append(_run_with_tools(loop, case, args.max_turns))
             mark = "✓" if rows["tools"][-1]["selection_ok"] else "✗"
             print(f"[tools]    {mark} {case['query'][:70]}")
-        summary["tools"] = summarise(rows["tools"])
     if "no-tools" in args.conditions:
         rows["no_tools"] = []
         for case in cases:
             rows["no_tools"].append(_run_without_tools(loop, case))
             print(f"[no-tools] {case['query'][:70]}")
-        summary["no_tools"] = summarise_answers(rows["no_tools"])
-    if len(rows) == 2:
-        summary["comparison"] = compare_conditions(rows["tools"], rows["no_tools"])
 
+    summary = build_summary(rows)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
-    out = Path(args.out)
+    out = Path(args.out or "reports/phase2_eval.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(

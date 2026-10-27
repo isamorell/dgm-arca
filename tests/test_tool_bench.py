@@ -12,9 +12,11 @@ import pytest
 from tool_use.evaluate import (
     answer_ok,
     arguments_match,
+    build_summary,
     compare_conditions,
     load_bench,
     numbers_in,
+    rescore,
     score_case,
     summarise,
     wilson_interval,
@@ -186,7 +188,11 @@ def test_free_text_arguments_only_need_to_be_present():
 
 def test_selection_for_cases_that_need_no_tool():
     case = {"needs_tool": False, "expected_tool": None}
-    assert score_case(case, []) == {"selection_ok": True, "arguments_ok": True}
+    assert score_case(case, []) == {
+        "selection_ok": True,
+        "arguments_ok": True,
+        "arguments_lenient_ok": True,
+    }
     assert not score_case(case, [{"name": "dose_calculator", "arguments": {}}])["selection_ok"]
 
 
@@ -204,6 +210,7 @@ def test_wrong_tool_scores_zero_and_sequence_is_checked():
     assert score_case(case, good) == {
         "selection_ok": True,
         "arguments_ok": True,
+        "arguments_lenient_ok": True,
         "sequence_ok": True,
     }
     assert score_case(case, good[:1])["sequence_ok"] is False
@@ -228,6 +235,15 @@ def test_answer_ok_uses_tolerance_and_ignores_numbers_from_the_query():
     assert answer_ok(case, "Con 490 mg y 11,75 mg/mL salen unos 40 mL.") is False
     assert answer_ok({"query": "q", "expected_answer": 1.6667}, "1,67 mL/min") is True
     assert answer_ok({"query": "q"}, "lo que sea") is None
+
+
+def test_answer_ok_rejects_small_arithmetic_slips():
+    """41,75 and 41,76 are not 41,7: a 0,5 % tolerance used to accept them."""
+    case = {"query": "Dame 490 mg con 11,75 mg/mL", "expected_answer": 41.7}
+    assert answer_ok(case, "Salen 41,75 mL.") is False
+    assert answer_ok(case, "Salen 41,76 mL.") is False
+    assert answer_ok(case, "Salen 41,702 mL.") is True
+    assert answer_ok({"query": "q", "expected_answer": 2.27}, "2.26796185 mg/lb") is True
 
 
 def test_answer_ok_accepts_an_expected_number_that_is_in_the_query():
@@ -294,3 +310,82 @@ def test_wilson_interval_is_wide_with_thirty_cases():
     low, high = wilson_interval(24, 30)
     assert low < 0.8 < 0.9 < high
     assert wilson_interval(0, 0) == (0.0, 0.0)
+
+
+# ---- optional arguments and rescoring ----------------------------------------------------
+
+
+def test_optional_arguments_can_be_ignored_when_the_expected_call_does_not_mention_them():
+    expected = {"active_ingredient": "furosemida"}
+    got = {"active_ingredient": "furosemida", "max_results": 10}
+    assert not arguments_match("search_medication_cima", got, expected)
+    assert arguments_match("search_medication_cima", got, expected, ignore_optional=True)
+    # a wrong required argument is still wrong, and so is an optional one the case fixes
+    wrong = {"active_ingredient": "ibuprofeno", "max_results": 10}
+    assert not arguments_match("search_medication_cima", wrong, expected, ignore_optional=True)
+    fixed = {"active_ingredient": "amoxicilina", "max_results": 3}
+    assert not arguments_match(
+        "search_medication_cima",
+        {"active_ingredient": "amoxicilina", "max_results": 10},
+        fixed,
+        ignore_optional=True,
+    )
+
+
+def test_score_case_reports_strict_and_lenient_arguments():
+    case = {
+        "needs_tool": True,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {"active_ingredient": "furosemida"},
+    }
+    calls = [
+        {
+            "name": "search_medication_cima",
+            "arguments": {"active_ingredient": "furosemida", "max_results": 10},
+        }
+    ]
+    scores = score_case(case, calls)
+    assert scores["arguments_ok"] is False and scores["arguments_lenient_ok"] is True
+
+
+def test_rescore_rewrites_the_scores_from_the_stored_behaviour():
+    case = {
+        "id": "c1",
+        "category": "calculo",
+        "query": "Dame 490 mg con 11,75 mg/mL",
+        "needs_tool": False,
+        "expected_tool": None,
+        "expected_arguments": {},
+        "expected_answer": 41.7,
+    }
+    data = {
+        "rows": {
+            "tools": [
+                {
+                    **case,
+                    "tool_calls": [],
+                    "answer": "Salen 41,75 mL.",
+                    "answer_ok": True,
+                    "selection_ok": False,
+                    "arguments_ok": False,
+                }
+            ],
+            "no_tools": [
+                {**case, "tool_calls": [], "answer": "Salen 41,7 mL.", "answer_ok": False}
+            ],
+        },
+        "summary": {},
+    }
+    result = rescore(data)
+    assert result["rows"]["tools"][0]["answer_ok"] is False
+    assert result["rows"]["tools"][0]["selection_ok"] is True
+    assert result["rows"]["no_tools"][0]["answer_ok"] is True
+    assert set(result["summary"]) == {"tools", "no_tools", "comparison"}
+    assert result["summary"]["comparison"]["only_without_tools"] == 1
+
+
+def test_build_summary_adds_the_lenient_argument_accuracy():
+    rows = {"tools": [_row("a", True, True, True, [], None, "1")]}
+    rows["tools"][0]["arguments_lenient_ok"] = True
+    assert build_summary(rows)["tools"]["argument_accuracy_ignoring_optional"] == 1.0
+    assert set(build_summary(rows)) == {"tools"}
