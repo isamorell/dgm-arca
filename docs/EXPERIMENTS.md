@@ -745,3 +745,168 @@ corregir eran 20/100 y 27/100.
   tokens para separar los fallos por truncado; y más problemas por conjunto.
 
 ---
+
+### 2026-10-25 · Fase 2 · Elección de las herramientas
+ 
+**Qué queríamos saber.** Qué tres herramientas (consulta externa, cálculo y acción) encajan con
+nuestro dominio, que es ayudar a estudiantes de Enfermería con cálculo de medicación, y si el
+plan de la propuesta seguía valiendo.
+ 
+**Qué hicimos.** Partimos de la propuesta: CIMA REST y PubChem PUG REST para consultar, Pint para
+calcular y una hoja de preparación en PDF como acción. Comprobamos los endpoints y los campos de
+CIMA contra su documentación oficial (`CIMA_REST_API.pdf`) antes de escribir la
+herramienta: `GET /medicamentos?practiv1=...&comerc=1` devuelve en una sola petición el nombre,
+la dosis o concentración (`dosis`), la forma farmacéutica y las vías de administración. Valoramos
+también openFDA como alternativa.
+ 
+Herramientas que quedan en `tool_use/tools.py`:
+ 
+| Tipo | Herramienta | Qué hace |
+|---|---|---|
+| Consulta externa | `search_medication_cima` | Presentaciones comercializadas de un principio activo (CIMA, AEMPS) |
+| Cálculo | `convert_units` | Conversión de unidades con Pint (añadimos el alias `mcg`) |
+| Cálculo | `dose_calculator` | Multiplicaciones y divisiones exactas (ver la entrada siguiente) |
+| Acción | `create_preparation_sheet` | Genera un PDF con medicamento, concentración, dosis, volumen o velocidad y pasos del cálculo; `requires_confirmation=True` |
+ 
+**Qué pasó.** Descartamos dos cosas de la propuesta:
+ 
+- **PubChem.** Su dato útil (fórmula y masa molecular) solo sirve en problemas con mmol o mEq, que
+  no están en nuestro dataset. El enunciado pide una herramienta de consulta externa, no dos, y
+  cada herramienta de más es una opción más entre las que el modelo puede equivocarse.
+- **openFDA.** Devuelve prosa en inglés sobre la posología, no concentraciones estructuradas, y
+  estamos trabajando con medicamentos comercializados en España.
+Tampoco usamos `get_weather` ni `calculator` del ejemplo: los quitamos del registro porque
+`calculator` se solapaba con `dose_calculator` y habría confundido la selección.
+ 
+**Qué concluimos.** En los problemas de nuestro dataset el fármaco ya viene dado, así que la
+consulta a CIMA no es imprescindible para resolverlos. Su papel es dar la presentación y la
+concentración reales cuando la petición no las incluye. Esto lo comprobaremos en el banco de
+pruebas con casos de ambos tipos. Si el modelo apenas la usa, lo contaremos en la interpretación.
+ 
+---
+
+### 2026-10-25 · Fase 2 · Una calculadora de dosis, porque el modelo falla en las divisiones
+ 
+**Qué queríamos saber.** Si merecía la pena una herramienta de cálculo dedicada además de Pint, y
+cómo debía ser para que el modelo la use justo donde falla.
+ 
+**Qué hicimos.** Partimos del análisis de fallos de la fase 1 (entrada del 2026-10-13): de los 5
+fallos de `grpo_sin_kl` que leímos completos, 4 eran errores aritméticos y solo 1 conceptual.
+El modelo plantea bien la operación y la ejecuta mal, sobre todo en divisiones con decimales:
+ 
+- 490 / 11,75 lo da como 41,2 (correcto: 41,7).
+- 40200 / 495 lo da como 81,666 (correcto: 81,21).
+- 370 / 2,75 le da cada vez un valor distinto y agota los 1024 tokens sin escribir `<answer>`.
+Por eso escribimos `dose_calculator(expression, decimals=2)`:
+ 
+- Aritmética exacta con `Fraction`, el mismo criterio que el generador de problemas de la fase 1
+  (`0.1 * 3` da exactamente `0.3`, sin error de coma flotante).
+- Redondeo half-up, igual que el verificador. El `round` de Python redondea half-even y daría
+  discrepancias con `MedicationVerifier`.
+- Solo acepta números y `+ - * / **` con exponente entero y menor o igual que 10. Rechaza la
+  división entre cero y cualquier otra sintaxis.
+- La docstring le dice al modelo cuándo usarla ("Always use this tool instead of calculating in
+  your head...") y da dos ejemplos de nuestro dominio (mg/kg con stock, mL/min).
+- `convert_units` (Pint) se encarga de las unidades, y `dose_calculator` de los números.
+**Qué pasó.** Todavía no lo hemos medido con el modelo. Solo comprobamos con tests que la
+herramienta calcula bien (por ejemplo, `(15 * 70) / 250 = 4.2` y `1 / 3` a tres decimales da
+`0.333`) y que rechaza la división entre cero y el código que no sea aritmética.
+ 
+**Qué concluimos.** Es una hipótesis, no un resultado: si el modelo llama a la calculadora en
+vez de dividir de cabeza, deberían desaparecer los fallos `valor_mal` por aritmética y los casos
+de `sin_answer` que vienen de bucles de recálculo (6 de 200 en test con `grpo_sin_kl`). Lo que no
+arregla es el error conceptual de unidades del caso 3 de la fase 1. Qué ocurre de verdad lo
+medimos en el banco de pruebas: tasa de llamadas a `dose_calculator` y exactitud con y sin
+herramientas.
+ 
+---
+
+### 2026-10-25 · Fase 2 · Pruebas de las herramientas sin red
+ 
+**Qué queríamos saber.** Si las herramientas funcionan y si el registro genera bien las
+definiciones antes de meter el modelo en el bucle.
+ 
+**Qué hicimos.** Ampliamos `tests/test_tool_registry.py` con tests de nuestras herramientas. Miran
+dos cosas: las definiciones que ve el modelo (nombre, descripción, argumentos obligatorios y tipos)
+y la ejecución a través de `ToolRegistry.call` (llamadas válidas, argumentos inválidos, errores de
+ejecución como observaciones y el PDF). Todo corre sin red: CIMA se prueba con una respuesta
+simulada.
+ 
+```bash
+python -m pytest tests/test_tool_registry.py -v
+```
+ 
+**Qué pasó.** La primera ejecución dio fallos y varios eran errores reales de `tools.py`:
+ 
+- `convert_units` tenía mal la firma (`value_float` en lugar de `value: float`, sin tipo), de modo
+  que el esquema no declaraba el argumento como número y la función fallaba con `NameError`.
+- Faltaba la constante `SHEETS_DIR` de `create_preparation_sheet`.
+- `requires_confirmation` no se puede pasar a `ToolRegistry.register`: se declara en el
+  decorador, `@tool(requires_confirmation=True)`. Nuestro `default_registry()` tenía el error.
+- Revisando el código vimos además que Pint lanza `DimensionalityError` al convertir mg a mL, y
+  esa excepción no es un `ValueError`. La capturamos y la convertimos en un mensaje claro, para
+  que el modelo reciba una observación útil y no el texto interno de Pint.
+También aprendimos cómo funciona el registro: la docstring **completa** (incluido `Args:`) pasa a
+la descripción de la herramienta, así que el modelo sí ve las indicaciones de los argumentos
+(por ejemplo, que el principio activo va en español), y los errores llegan al modelo como
+`TipoDeError: mensaje`.
+ 
+Tras corregirlo, todos los tests pasan. Ninguno toca la API real de CIMA: las comprobamos aparte, 
+en la siguiente entrada.
+ 
+**Qué concluimos.** Las herramientas funcionan de forma aislada y sin red. Con esto no sabemos
+todavía si el modelo las elige bien, solo que, si las llama, harán lo esperado. La respuesta
+simulada de CIMA solo prueba nuestro formateo: que la API real devuelva lo que esperamos queda
+por comprobar a mano. Los tests de
+definición (`required`, tipos) sirven para detectar si un cambio en una docstring o en un tipo
+rompe el esquema que ve el modelo.
+ 
+---
+
+### 2026-10-25 · Fase 2 · Prueba de `search_medication_cima` contra la API real de CIMA
+ 
+**Qué queríamos saber.** Si CIMA responde como esperábamos desde el DGX y si lo que devuelve
+sirve de verdad para los cálculos de nuestros problemas.
+ 
+**Qué hicimos.** Cuatro consultas a mano, sin modificar la herramienta:
+ 
+```bash
+python -c "from tool_use.tools import search_medication_cima as t; print(t(active_ingredient='paracetamol', max_results=3))"
+python -c "from tool_use.tools import default_registry as d; r = d().call('search_medication_cima', {'active_ingredient': 'furosemida'}); print(r.ok, round(r.latency_ms), 'ms'); print(r.result or r.error)"
+python -c "from tool_use.tools import search_medication_cima as t; print(t(active_ingredient='paracetamol', max_results=10))"
+python -c "from tool_use.tools import default_registry as d; r = d().call('search_medication_cima', {'active_ingredient': 'xyzabc'}); print(r.ok, r.error)"
+```
+ 
+**Qué pasó.**
+ 
+- **Funciona desde el DGX.** `furosemida` devuelve 5 presentaciones a través del registro en
+  326 ms. Cada línea trae nombre, `dose`, forma farmacéutica, vías de administración y número de
+  registro.
+- **Nombre inexistente.** `xyzabc` devuelve `ok = False` con `ValueError: No marketed medicines
+  found for active ingredient 'xyzabc'`: una observación clara para el modelo.
+- **`paracetamol` con 10 resultados: las 10 presentaciones son orales** (comprimidos, granulado,
+  soluciones orales, un combinado con ibuprofeno y cafeína), ordenadas alfabéticamente. Ninguna
+  es intravenosa. CIMA no filtra por forma ni por vía y la herramienta solo mira la primera
+  página.
+- **`dose` no es la concentración.** Es la cantidad de principio activo por unidad. En
+  `FUROSEMIDA PHYSAN 20mg/2ml SOLUCIÓN INYECTABLE` dice solo `20 mg`: la concentración (10 mg/mL)
+  solo aparece en el nombre. Nuestra docstring decía que `dose` podía ser una concentración, por
+  ejemplo `10 mg/ml`, lo cual es engañoso.
+
+**Qué concluimos.** La API real funciona y la herramienta devuelve lo que esperábamos en cuanto
+a formato y latencia. Pero tiene dos limitaciones que afectan a los problemas de nuestro dominio,
+donde la presentación suele ser un inyectable o una perfusión:
+ 
+1. Una petición como "paracetamol IV" puede no encontrar su presentación, porque las primeras
+   páginas son todas orales.
+2. Para calcular un volumen, el modelo tendría que leer la concentración del nombre, no del campo
+   `dose`.
+
+Decisión de momento: **no modificamos la herramienta ni su docstring**. Soluciones posibles,
+sin implementar: un argumento opcional `form` que filtre por forma o vía recorriendo varias
+páginas, y una docstring que explique que `dose` es la cantidad por unidad. Hay que tenerlas
+presentes al montar el banco de pruebas: incluir al menos un caso donde la presentación correcta
+sea un inyectable permitirá medir si esta limitación pesa en la práctica. Si el modelo falla ahí,
+quedará documentado con esta entrada como causa probable.
+
+---
