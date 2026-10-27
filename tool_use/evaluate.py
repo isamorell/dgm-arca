@@ -214,17 +214,42 @@ def numbers_in(text: str) -> set[float]:
     return found
 
 
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def strip_thinking(text: str) -> str:
+    """Remove the reasoning from a completion, keeping only what the user would read.
+
+    A model trained to reason (phase 1) writes ``<think> ... </think>`` before answering and
+    the intermediate numbers of that reasoning must not count as the answer. Handles a closed
+    block, a block cut by the token limit (everything after ``<think>`` is dropped) and a
+    closing tag without an opening one (the template may have opened it in the prompt).
+    """
+    text = _THINK_BLOCK.sub("", text)
+    if "<think>" in text:
+        text = text.split("<think>", 1)[0]
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
+
+
+def has_unfinished_thinking(text: str) -> bool:
+    """True if the completion opened a ``<think>`` block and never closed it (ran out of tokens)."""
+    return "<think>" in _THINK_BLOCK.sub("", text)
+
+
 def answer_ok(case: dict[str, Any], answer: str) -> bool | None:
     """Does the final answer contain the expected number? ``None`` if the case has none.
 
     Numbers that already appear in the query are ignored (so repeating the data does not count),
     unless the expected answer is one of them. This is a heuristic: it can miss a correct answer
-    written in words and cannot tell the right number in the wrong sentence.
+    written in words and cannot tell the right number in the wrong sentence. The reasoning
+    (``<think>`` block) is not part of the answer and is removed before looking for the number.
     """
     expected = case.get("expected_answer")
     if expected is None:
         return None
-    candidates = numbers_in(answer)
+    candidates = numbers_in(strip_thinking(answer))
     from_query = numbers_in(case.get("query", ""))
     if not any(math.isclose(expected, q, rel_tol=1e-9) for q in from_query):
         candidates -= from_query
@@ -281,15 +306,19 @@ def wilson_interval(successes: int, n: int, z: float = 1.96) -> tuple[float, flo
 def summarise_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Final-answer accuracy over the cases that have an expected answer."""
     scored = [r for r in rows if r.get("answer_ok") is not None]
+    out: dict[str, Any] = {"n_answer_cases": len(scored)}
+    if rows and any("think>" in r.get("answer", "") for r in rows):
+        # Only for models that reason: how often the thinking ate the whole token budget.
+        out["unfinished_thinking_rate"] = sum(
+            has_unfinished_thinking(r.get("answer", "")) for r in rows
+        ) / len(rows)
     if not scored:
-        return {"n_answer_cases": 0}
+        return out
     ok = sum(bool(r["answer_ok"]) for r in scored)
     low, high = wilson_interval(ok, len(scored))
-    return {
-        "answer_accuracy": ok / len(scored),
-        "answer_accuracy_ci95": [round(low, 3), round(high, 3)],
-        "n_answer_cases": len(scored),
-    }
+    out["answer_accuracy"] = ok / len(scored)
+    out["answer_accuracy_ci95"] = [round(low, 3), round(high, 3)]
+    return out
 
 
 def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -415,11 +444,57 @@ def _run_with_tools(loop, case: dict[str, Any], max_turns: int) -> dict[str, Any
     return row
 
 
-def _run_without_tools(loop, case: dict[str, Any]) -> dict[str, Any]:
-    messages = [
+def no_tools_messages(query: str, prompt: str = "neutral") -> list[dict[str, str]]:
+    """Conversation of the no-tools condition.
+
+    ``neutral`` is a plain instruction, the same for every model. ``phase1`` is the system
+    prompt the reasoning model was trained and evaluated with (``<think>``/``<answer>``), so a
+    fine-tuned adapter is not penalised in the baseline for being used off-distribution.
+    """
+    if prompt == "phase1":
+        from rlm.data import build_prompt  # lazy: pulls in ``datasets``
+
+        return build_prompt(query)
+    return [
         {"role": "system", "content": NO_TOOLS_SYSTEM_PROMPT},
-        {"role": "user", "content": case["query"]},
+        {"role": "user", "content": query},
     ]
+
+
+def apply_adapter(loop, adapter: str) -> None:
+    """Put a LoRA adapter (local folder or Hugging Face repo id) on top of the loaded base model.
+
+    ``ToolLoop.load`` only loads the base model; this is the same ``PeftModel.from_pretrained``
+    that ``rlm/inference.py`` uses for the phase-1 model. The base model the adapter was trained
+    on (stored in its config) must be the one in ``loop``; a mismatch is reported, not hidden.
+    """
+    from peft import PeftConfig, PeftModel
+
+    trained_on = PeftConfig.from_pretrained(adapter).base_model_name_or_path
+    if trained_on and trained_on != loop.model_id:
+        print(f"WARNING: adapter trained on {trained_on}, but the loaded model is {loop.model_id}")
+    loop.model = PeftModel.from_pretrained(loop.model, adapter).eval()
+
+
+def enable_thinking(loop) -> None:
+    """Let the model write its ``<think>`` block, as it did in phase 1.
+
+    ``ToolLoop.generate`` always renders the chat template with ``enable_thinking=False``, which
+    pre-fills an empty think block. That is right for vanilla Qwen3 but off-distribution for a
+    model trained to open ``<think>`` itself. The template flag is overridden here so the
+    executor (not ours) stays untouched.
+    """
+    original = loop.tokenizer.apply_chat_template
+
+    def apply_chat_template(*args, **kwargs):
+        kwargs["enable_thinking"] = True
+        return original(*args, **kwargs)
+
+    loop.tokenizer.apply_chat_template = apply_chat_template
+
+
+def _run_without_tools(loop, case: dict[str, Any], prompt: str = "neutral") -> dict[str, Any]:
+    messages = no_tools_messages(case["query"], prompt)
     try:
         answer, error = loop.generate(messages).strip(), None
     except Exception as exc:  # noqa: BLE001
@@ -451,6 +526,24 @@ def main() -> None:
         help="Hugging Face model id or local path (default: ARCA_RLM_BASE_MODEL from .env).",
     )
     parser.add_argument(
+        "--adapter",
+        default=None,
+        help="LoRA adapter (local folder or Hugging Face repo id) to apply on the base model.",
+    )
+    parser.add_argument(
+        "--thinking",
+        action="store_true",
+        help="Let the model reason in <think> (the phase-1 format) instead of the executor's "
+        "enable_thinking=False. Use it with --adapter.",
+    )
+    parser.add_argument(
+        "--no-tools-prompt",
+        choices=["neutral", "phase1"],
+        default="neutral",
+        help="System prompt of the no-tools condition: a neutral one (default) or the phase-1 "
+        "R1-Zero prompt the adapter was trained with.",
+    )
+    parser.add_argument(
         "--allow-side-effects",
         action="store_true",
         help="Really execute tools that require confirmation (writes the PDF sheets).",
@@ -480,6 +573,11 @@ def main() -> None:
 
     loop = ToolLoop(model_id=model_id, allow_side_effects=args.allow_side_effects)
     loop.load()
+    if args.adapter:
+        apply_adapter(loop, args.adapter)
+        print(f"Adapter: {args.adapter}")
+    if args.thinking:
+        enable_thinking(loop)
     cases = load_bench(args.bench)
 
     rows: dict[str, list[dict[str, Any]]] = {}
@@ -492,7 +590,7 @@ def main() -> None:
     if "no-tools" in args.conditions:
         rows["no_tools"] = []
         for case in cases:
-            rows["no_tools"].append(_run_without_tools(loop, case))
+            rows["no_tools"].append(_run_without_tools(loop, case, args.no_tools_prompt))
             print(f"[no-tools] {case['query'][:70]}")
 
     summary = build_summary(rows)
@@ -501,7 +599,15 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
-            {"model": loop.model_id, "bench": args.bench, "summary": summary, "rows": rows},
+            {
+                "model": loop.model_id,
+                "adapter": args.adapter,
+                "thinking": args.thinking,
+                "no_tools_prompt": args.no_tools_prompt,
+                "bench": args.bench,
+                "summary": summary,
+                "rows": rows,
+            },
             indent=2,
             ensure_ascii=False,
         )

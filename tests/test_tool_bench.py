@@ -389,3 +389,109 @@ def test_build_summary_adds_the_lenient_argument_accuracy():
     rows["tools"][0]["arguments_lenient_ok"] = True
     assert build_summary(rows)["tools"]["argument_accuracy_ignoring_optional"] == 1.0
     assert set(build_summary(rows)) == {"tools"}
+
+
+# ------------------------------------------------- phase-1 model (adapter, thinking)
+
+
+def test_strip_thinking_handles_closed_cut_and_orphan_blocks():
+    from tool_use.evaluate import strip_thinking
+
+    assert (
+        strip_thinking("<think>2 * 5 = 10</think> <answer>10 mL</answer>")
+        == "<answer>10 mL</answer>"
+    )
+    assert strip_thinking("sin razonamiento: 7 mL") == "sin razonamiento: 7 mL"
+    # Cut by the token limit: nothing after <think> is an answer.
+    assert strip_thinking("<think>primero calculo 12.5 y luego") == ""
+    # The template opened the block in the prompt: only the closing tag is in the completion.
+    assert strip_thinking("razono 99\n</think>\nResultado: 4") == "Resultado: 4"
+
+
+def test_answer_ok_ignores_numbers_that_only_appear_in_the_reasoning():
+    from tool_use.evaluate import answer_ok
+
+    case = {"query": "Pauta de 500 mg a 250 mg/mL", "expected_answer": 2.0}
+    assert answer_ok(case, "<think>500 / 250 = 2</think> <answer>5 mL</answer>") is False
+    assert answer_ok(case, "<think>500 / 250</think> <answer>2 mL</answer>") is True
+    # A truncated reasoning that happens to contain the number is not an answer.
+    assert answer_ok(case, "<think>500 / 250 = 2") is False
+
+
+def test_unfinished_thinking_rate_is_reported_only_for_reasoning_outputs():
+    from tool_use.evaluate import has_unfinished_thinking, summarise_answers
+
+    assert has_unfinished_thinking("<think>no termina")
+    assert not has_unfinished_thinking("<think>termina</think> 2 mL")
+    plain = [{"answer": "2 mL", "answer_ok": True}]
+    assert "unfinished_thinking_rate" not in summarise_answers(plain)
+    reasoning = [
+        {"answer": "<think>no termina", "answer_ok": False},
+        {"answer": "<think>ok</think> 2 mL", "answer_ok": True},
+    ]
+    assert summarise_answers(reasoning)["unfinished_thinking_rate"] == 0.5
+
+
+def test_no_tools_messages_neutral_prompt_is_the_default():
+    from tool_use.evaluate import NO_TOOLS_SYSTEM_PROMPT, no_tools_messages
+
+    assert no_tools_messages("¿Cuántos mL?") == [
+        {"role": "system", "content": NO_TOOLS_SYSTEM_PROMPT},
+        {"role": "user", "content": "¿Cuántos mL?"},
+    ]
+
+
+def test_no_tools_messages_phase1_prompt_is_the_one_used_in_training():
+    pytest.importorskip("datasets")
+    from rlm.data import R1_ZERO_SYSTEM_PROMPT
+    from tool_use.evaluate import no_tools_messages
+
+    messages = no_tools_messages("¿Cuántos mL?", "phase1")
+    assert messages[0] == {"role": "system", "content": R1_ZERO_SYSTEM_PROMPT}
+    assert messages[1]["content"] == "¿Cuántos mL?"
+
+
+def test_enable_thinking_overrides_the_flag_of_the_executor():
+    from types import SimpleNamespace
+
+    from tool_use.evaluate import enable_thinking
+
+    seen = []
+
+    class FakeTokenizer:
+        def apply_chat_template(self, messages, **kwargs):
+            seen.append(kwargs)
+            return "prompt"
+
+    loop = SimpleNamespace(tokenizer=FakeTokenizer())
+    enable_thinking(loop)
+    # What ToolLoop.generate does: it asks for enable_thinking=False.
+    loop.tokenizer.apply_chat_template([], tokenize=False, enable_thinking=False)
+    assert seen == [{"tokenize": False, "enable_thinking": True}]
+
+
+def test_apply_adapter_wraps_the_base_model_and_warns_on_a_different_base(monkeypatch, capsys):
+    import sys
+    from types import SimpleNamespace
+
+    from tool_use.evaluate import apply_adapter
+
+    class FakeWrapped:
+        def __init__(self, base):
+            self.base = base
+
+        def eval(self):
+            return self
+
+    # A stand-in for ``peft``: the test needs neither the library nor a model.
+    fake_peft = SimpleNamespace(
+        PeftConfig=SimpleNamespace(
+            from_pretrained=lambda path: SimpleNamespace(base_model_name_or_path="Qwen/Qwen3-1.7B")
+        ),
+        PeftModel=SimpleNamespace(from_pretrained=lambda model, path: FakeWrapped(model)),
+    )
+    monkeypatch.setitem(sys.modules, "peft", fake_peft)
+    loop = SimpleNamespace(model="base", model_id="Qwen/Qwen3-0.6B")
+    apply_adapter(loop, "some/adapter")
+    assert isinstance(loop.model, FakeWrapped) and loop.model.base == "base"
+    assert "WARNING" in capsys.readouterr().out
