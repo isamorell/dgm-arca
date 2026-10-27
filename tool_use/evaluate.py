@@ -25,13 +25,14 @@ using them well. The metrics are:
   tolerance. It is only defined for cases with ``expected_answer``.
 
 The same model can be run in two conditions on the same cases: with the tools, and without them
-(the model answers on its own). The model is always given explicitly (``--model-id``), because
-the executor falls back to environment variables when it is not. Tools with side effects (the
-preparation sheet) are not executed unless ``--allow-side-effects`` is passed: the benchmark
-only needs the first call, and this keeps it free of files. Run::
+(the model answers on its own). The model comes from ``--model-id`` or, if absent, from
+``ARCA_RLM_BASE_MODEL`` in your ``.env`` (see ``.env.example``), and it is always passed to the
+executor explicitly, so the executor does not need the adapter variables. Tools with side
+effects (the preparation sheet) are not executed unless ``--allow-side-effects`` is passed: the
+benchmark only needs the first call, and this keeps it free of files. Run::
 
-    uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-1.7B \\
-        --bench tool_use/bench/cases.jsonl --out reports/phase2_eval.json
+    uv run python -m tool_use.evaluate --bench tool_use/bench/cases.jsonl \\
+        --out reports/phase2_eval.json
 """
 
 from __future__ import annotations
@@ -47,8 +48,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-# Base model of the phase 2 benchmark unless --model-id says otherwise.
-DEFAULT_MODEL_ID = os.environ.get("ARCA_RLM_BASE_MODEL") or "Qwen/Qwen3-1.7B"
+# Used only when neither --model-id nor ARCA_RLM_BASE_MODEL (.env) is set.
+FALLBACK_MODEL_ID = "Qwen/Qwen3-1.7B"
 
 NO_TOOLS_SYSTEM_PROMPT = (
     "You are an AI assistant that helps nursing students with medication calculations. "
@@ -389,8 +390,8 @@ def main() -> None:
     parser.add_argument("--max-turns", type=int, default=5)
     parser.add_argument(
         "--model-id",
-        default=DEFAULT_MODEL_ID,
-        help="Hugging Face model id or local path (default: ARCA_RLM_BASE_MODEL, else Qwen3-1.7B).",
+        default=None,
+        help="Hugging Face model id or local path (default: ARCA_RLM_BASE_MODEL from .env).",
     )
     parser.add_argument(
         "--allow-side-effects",
@@ -406,9 +407,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    from dotenv import load_dotenv
+
+    load_dotenv()  # each teammate defines their own .env (see .env.example)
+    model_id = args.model_id or os.environ.get("ARCA_RLM_BASE_MODEL") or FALLBACK_MODEL_ID
+    print(f"Model: {model_id}")
+
     from tool_use.executor import ToolLoop
 
-    loop = ToolLoop(model_id=args.model_id, allow_side_effects=args.allow_side_effects)
+    loop = ToolLoop(model_id=model_id, allow_side_effects=args.allow_side_effects)
     loop.load()
     cases = load_bench(args.bench)
 
