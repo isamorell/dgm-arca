@@ -87,6 +87,7 @@ def test_medication_verifier_still_rejects_wrong_unit_or_value():
     [
         ("95 mL", "mL", ["ml", "cc"]),
         ("95 ml", "mL", ["ml", "cc"]),
+        ("95 cc", "mL", ["ml", "cc"]),  # regression: "cc" was never extracted as a unit
         ("16,7 mL/h", "mL/h", ["ml/h"]),
         ("6.9 mg", "mg", ["miligramos"]),
         ("21 gotas/min", "gotas/min", ["gotas por minuto", "gotas/minuto", "gtt/min"]),
@@ -101,6 +102,7 @@ def test_original_units_are_still_accepted(answer, unit, aliases):
     ("answer", "unit", "aliases"),
     [
         ("95 mg", "mL", ["ml", "cc"]),
+        ("95 cc/h", "mL", ["ml", "cc"]),  # a rate is not a volume
         ("16.7 mL", "mL/h", ["ml/h"]),
         ("6.9 g", "mg", ["miligramos"]),
         ("21 mL/h", "gotas/min", ["gotas por minuto"]),
