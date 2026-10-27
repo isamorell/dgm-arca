@@ -140,12 +140,13 @@ class ToolLoop:
             messages.append({"role": "assistant", "content": raw})
 
             for call in parsed.tool_calls:
-                if call.error:
-                    return ToolCallRecord(name=call.name or "unknown", arguments=call.arguments, ok=False, error=f"invalid tool call: {call.error}")
-
                 tool = self.registry.tools.get(call.name)
-                if tool is not None and tool.requires_confirmation and not self.allow_side_effects:
-                    return ToolCallRecord(
+                needs_confirmation = tool is not None and tool.requires_confirmation
+
+                if call.error:
+                    record = ToolCallRecord(name=call.name or "unknown", arguments=call.arguments, ok=False, error=f"invalid tool call: {call.error}")
+                elif needs_confirmation and not self.allow_side_effects:
+                    record = ToolCallRecord(
                         name=call.name,
                         arguments=call.arguments,
                         ok=False,
@@ -153,8 +154,9 @@ class ToolLoop:
                         error="this tool has side effects and requires user confirmation; "
                         "it was NOT executed. Ask the user to confirm.",
                     )
-
-                record = self.registry.call(call.name, call.arguments)
+                else:
+                    record = self.registry.call(call.name, call.arguments)
+                    record.requires_confirmation = needs_confirmation
                 records.append(record)
 
                 payload = record.result if record.ok else record.error
