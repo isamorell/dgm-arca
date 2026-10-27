@@ -54,15 +54,8 @@ class ToolLoop:
     def __init__(self, registry: ToolRegistry | None = None, model_id: str | None = None, allow_side_effects: bool | None = None, max_new_tokens: int = 1024):
         self.registry = registry or default_registry()
 
-        if model_id is None:
-            adapter = os.environ.get("ARCA_RLM_ADAPTER")
-            if not Path(adapter).exists():
-                repo = os.environ.get("ARCA_RLM_ADAPTER_REPO")
-                if repo:
-                    from huggingface_hub import snapshot_download
-                    snapshot_download(repo, local_dir=adapter)
-                else:
-                    raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter} (define ARCA_RLM_ADAPTER_REPO to download it from Hub)")
+        # Without an explicit model, the adapter of the environment must be available (see load()).
+        self._check_env_adapter = model_id is None
 
         self.model_id = model_id or os.environ.get("ARCA_RLM_BASE_MODEL")
         self.model = None
@@ -73,6 +66,26 @@ class ToolLoop:
         self.allow_side_effects = allow_side_effects
         self.max_new_tokens = max_new_tokens
 
+    def _ensure_env_adapter(self) -> None:
+        """Make sure the ``ARCA_RLM_ADAPTER`` folder exists, downloading it from the Hub if needed.
+
+        Done in ``load()`` and not in ``__init__`` so that building a ``ToolLoop`` (tests, scripts
+        that only use ``generate`` or the registry) does not need the adapter nor the network.
+        If ``ARCA_RLM_ADAPTER`` is not defined there is nothing to ensure.
+        """
+        adapter = os.environ.get("ARCA_RLM_ADAPTER")
+        if not adapter or Path(adapter).exists():
+            return
+        repo = os.environ.get("ARCA_RLM_ADAPTER_REPO")
+        if not repo:
+            raise FileNotFoundError(
+                f"ARCA_RLM_ADAPTER points to a missing folder: {adapter} "
+                "(define ARCA_RLM_ADAPTER_REPO to download it from Hub)"
+            )
+        from huggingface_hub import snapshot_download
+
+        snapshot_download(repo, local_dir=adapter)
+
     def load(self) -> None:
         """Tu turno: load tokenizer and model (bf16 on GPU).
 
@@ -80,6 +93,8 @@ class ToolLoop:
         ``apply_chat_template``. Using it instead of pasting JSON into the system prompt is
         allowed, but then explain in your README what the template actually renders.
         """
+        if self._check_env_adapter:
+            self._ensure_env_adapter()
         device = "cuda" if torch.cuda.is_available() else "cpu"
         dtype = torch.bfloat16 if device == "cuda" else torch.float32
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
@@ -174,7 +189,7 @@ class ToolLoop:
             answer=f"No pude completar la tarea en {max_turns} turnos.",
             tool_calls=records,
             turns=max_turns,
-            model=self.model_id,
+            model=self.model_id or "",
         )
 
 

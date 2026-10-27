@@ -162,3 +162,62 @@ def test_format_tool_result():
 def test_record_type(monkeypatch):
     r = make_loop(monkeypatch, [call("add", a=1, b=1), "ok"]).run("x")
     assert isinstance(r.tool_calls[0], ToolCallRecord)
+
+# ------------------------------------------- the adapter is only needed to load the model
+
+
+def test_building_the_loop_needs_neither_env_vars_nor_the_adapter(monkeypatch):
+    monkeypatch.delenv("ARCA_RLM_ADAPTER", raising=False)
+    monkeypatch.delenv("ARCA_RLM_BASE_MODEL", raising=False)
+    ToolLoop(registry=ToolRegistry().register(add))
+    monkeypatch.setenv("ARCA_RLM_ADAPTER", "does/not/exist")
+    ToolLoop(registry=ToolRegistry().register(add))
+
+
+def test_load_fails_clearly_if_the_adapter_is_missing_and_there_is_no_repo(monkeypatch):
+    monkeypatch.setenv("ARCA_RLM_ADAPTER", "does/not/exist")
+    monkeypatch.delenv("ARCA_RLM_ADAPTER_REPO", raising=False)
+    loop = ToolLoop(registry=ToolRegistry().register(add))
+    with pytest.raises(FileNotFoundError, match="ARCA_RLM_ADAPTER_REPO"):
+        loop.load()
+
+
+def test_load_downloads_the_adapter_from_the_hub_if_it_is_missing(monkeypatch, tmp_path):
+    import sys
+    from types import SimpleNamespace
+
+    from tool_use import executor
+
+    downloads = []
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(snapshot_download=lambda repo, local_dir: downloads.append((repo, local_dir))),
+    )
+    fake = SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace(eval=lambda: "model"))
+    monkeypatch.setattr(executor, "AutoTokenizer", fake)
+    monkeypatch.setattr(executor, "AutoModelForCausalLM", fake)
+    adapter = str(tmp_path / "adapter")
+    monkeypatch.setenv("ARCA_RLM_ADAPTER", adapter)
+    monkeypatch.setenv("ARCA_RLM_ADAPTER_REPO", "user/repo")
+    ToolLoop(registry=ToolRegistry().register(add)).load()
+    assert downloads == [("user/repo", adapter)]
+
+
+def test_load_does_not_check_the_adapter_if_the_model_is_given(monkeypatch):
+    from types import SimpleNamespace
+
+    from tool_use import executor
+
+    fake = SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace(eval=lambda: "model"))
+    monkeypatch.setattr(executor, "AutoTokenizer", fake)
+    monkeypatch.setattr(executor, "AutoModelForCausalLM", fake)
+    monkeypatch.setenv("ARCA_RLM_ADAPTER", "does/not/exist")  # would raise if it were checked
+    monkeypatch.delenv("ARCA_RLM_ADAPTER_REPO", raising=False)
+    ToolLoop(registry=ToolRegistry().register(add), model_id="Qwen/Qwen3-0.6B").load()
+
+
+def test_max_turns_reached_works_without_a_model_id(monkeypatch):
+    monkeypatch.delenv("ARCA_RLM_BASE_MODEL", raising=False)
+    r = make_loop(monkeypatch, [call("add", a=1, b=1)] * 2).run("x", max_turns=2)
+    assert r.model == ""
