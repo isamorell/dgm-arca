@@ -12,17 +12,13 @@ Several <tool_call> blocks in one generation are executed in the same turn (para
 
 ``run_tool_loop`` is what ``POST /tools`` calls. Until you implement it, the endpoint
 answers 501.
-
-Configuration (environment variables):
-
-* ``ARCA_TOOLS_MODEL``               model id (default ``Qwen/Qwen3-1.7B``)
-* ``ARCA_TOOLS_ALLOW_SIDE_EFFECTS``  1 = run tools with ``requires_confirmation`` and flag
-                                     them; 0 = block them (default 1)
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -57,7 +53,18 @@ class ToolLoop:
 
     def __init__(self, registry: ToolRegistry | None = None, model_id: str | None = None, allow_side_effects: bool | None = None, max_new_tokens: int = 1024):
         self.registry = registry or default_registry()
-        self.model_id = model_id or os.environ.get("ARCA_TOOLS_MODEL") or "Qwen/Qwen3-1.7B"
+
+        if model_id is None:
+            adapter = os.environ.get("ARCA_RLM_ADAPTER")
+            if not Path(adapter).exists():
+                repo = os.environ.get("ARCA_RLM_ADAPTER_REPO")
+                if repo:
+                    from huggingface_hub import snapshot_download
+                    snapshot_download(repo, local_dir=adapter)
+                else:
+                    raise FileNotFoundError(f"ARCA_RLM_ADAPTER points to a missing folder: {adapter} (define ARCA_RLM_ADAPTER_REPO to download it from Hub)")
+
+        self.model_id = model_id or os.environ.get("ARCA_RLM_BASE_MODEL")
         self.model = None
         self.tokenizer = None
 
