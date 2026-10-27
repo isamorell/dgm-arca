@@ -19,6 +19,11 @@ import re
 from api.schemas import RagResponse, RetrievedChunk
 from rag.retriever import Hit
 
+CHUNKING = "recursive" # "recursive" | "semantic"
+CORPUS_DIR = "rag/corpus"
+GENERATOR_MODEL = "Qwen/Qwen3-1.7B"
+LAMBDA_BM25 = 0.5
+
 RAG_PROMPT_TEMPLATE = """Use the provided up-to-date information to answer the question.
 Cite the passages you rely on by writing their id in square brackets, like [{example_id}].
 If the information is not enough to answer, say so instead of guessing.
@@ -77,15 +82,63 @@ class RagPipeline:
         Persist the dense index under ``rag/index/`` so this is fast after the first run.
         The generator can be your phase-1 RLM or the base model; record which in ``model``.
         """
-        raise NotImplementedError("Phase 3 is not implemented yet: see rag/README.md.")
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        from rag.chunking import recursive_chunks, semantic_chunks
+        from rag.embed import Embedder
+        from rag.ingest import load_corpus
+        from rag.retriever import BM25Retriever, DenseRetriever, HybridRetriever
+
+        documents = load_corpus(CORPUS_DIR)
+        embedder = Embedder()
+
+        if CHUNKING == "recursive":
+            chunks = recursive_chunks(documents)
+        else:
+            chunks = semantic_chunks(documents, embedder.embed_passages)
+
+        bm25 = BM25Retriever(chunks)
+        dense = DenseRetriever(chunks, embedder)
+        hybrid = HybridRetriever(bm25, dense, weight_bm25=LAMBDA_BM25)
+        self.retrievers = {"bm25": bm25, "dense": dense, "hybrid": hybrid}
+
+        self.model_id = os.environ.get("ARCA_RLM_BASE_MODEL")
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_id, torch_dtype=torch.bfloat16, device_map="auto"
+        )
+
+        self.model.eval()
+        
 
     def retrieve(self, question: str, top_k: int, retriever: str) -> list[Hit]:
         """Tu turno: dispatch to the dense, bm25 or hybrid retriever."""
-        raise NotImplementedError
+        if retriever not in self.retrievers.keys():
+            raise ValueError(f"Retriever must be one of {self.retrievers.keys()}, got {retriever!r}")
+        return self.retrievers[retriever].search(question, top_k=top_k)
+
+    def _generate(self, prompt: str) -> str:
+        """Helper: apply the chat template, decode greedily, drop any <think> block."""
+        text = self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            out = self.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS, do_sample=False)
+        answer = self.tokenizer.decode(
+            out[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True
+        )
+        return re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
 
     def answer(self, question: str, top_k: int = 5, retriever: str = "hybrid") -> RagResponse:
         """Tu turno: retrieve -> ``build_prompt`` -> generate -> ``to_response``."""
-        raise NotImplementedError
+        hits = self.retrieve(question, top_k, retriever)
+        prompt = build_prompt(question, hits)
+        answer = self._generate(prompt)
+        return to_response(answer, hits, retriever, model=self.model_id)
 
 
 _pipeline: RagPipeline | None = None
