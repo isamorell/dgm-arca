@@ -221,3 +221,11 @@ def test_max_turns_reached_works_without_a_model_id(monkeypatch):
     monkeypatch.delenv("ARCA_RLM_BASE_MODEL", raising=False)
     r = make_loop(monkeypatch, [call("add", a=1, b=1)] * 2).run("x", max_turns=2)
     assert r.model == ""
+
+
+def test_response_reports_the_model_that_answered(monkeypatch):
+    monkeypatch.setenv("ARCA_RLM_BASE_MODEL", "Qwen/Qwen3-0.6B")
+    r = make_loop(monkeypatch, [call("add", a=1, b=1), "Son 2."]).run("x")
+    assert r.model == "Qwen/Qwen3-0.6B"
+    monkeypatch.delenv("ARCA_RLM_BASE_MODEL")
+    assert make_loop(monkeypatch, ["Hola."]).run("x").model == ""
