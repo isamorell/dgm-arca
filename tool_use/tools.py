@@ -78,9 +78,8 @@ def _unit_registry():
 def convert_units(value: float, from_unit: str, to_unit: str) -> float:
     """Convert a quantity between two units of the same kind, such as mass, volume, time or rate.
  
-    Examples: 0.5 g to mg, 250 mcg to mg, 1.5 L to mL, 2 h to min, 5 mg/kg to mg/lb,
-    100 mL/h to mL/min. It cannot convert between different kinds (for example mg to mL):
-    that needs the concentration, so use dose_calculator for it.
+    It cannot convert between different kinds (for example mg to mL): that needs the
+    concentration, so use dose_calculator for it.
  
     Args:
         value: The numeric quantity to convert.
@@ -100,15 +99,14 @@ def dose_calculator(expression: str, decimals: int = 2) -> float:
     """Compute exactly any multiplication or division of doses, weights, volumes or rates.
  
     Always use this tool instead of calculating in your head when a step multiplies or
-    divides numbers, for example '(15 * 70) / 250' for a 15 mg/kg dose in a 70 kg patient
-    with a 250 mg/mL stock, or '500 / (8 * 60)' for mL/min. Units must already be
-    consistent (convert them first with convert_units). The arithmetic is exact (no
+    divides numbers. Units must already be consistent (convert them first with
+    convert_units). The arithmetic is exact (no
     floating-point error) and the result is rounded half up to the given decimals.
     Only numbers, parentheses and the operators + - * / ** (integer exponents) are allowed.
  
     Args:
-        expression: Arithmetic expression with plain numbers, without units,
-            for example '(0.5 * 12) / 2.5'. Use a dot as the decimal separator.
+        expression: Arithmetic expression with plain numbers, without units.
+            Use a dot as the decimal separator.
         decimals: Number of decimal places of the result, from 0 to 6.
     """
     import ast
@@ -155,11 +153,11 @@ def create_preparation_sheet(
     sheet, and only after the calculation is finished. Never include patient names.
  
     Args:
-        medication: Medication name, for example 'Paracetamol'.
-        concentration: Concentration or strength of the stock used, with unit, for example '10 mg/mL'.
-        dose: Calculated dose, with unit, for example '1050 mg'.
-        administration: Volume or rate to administer, with unit, for example '105 mL' or '21 mL/h'.
-        steps: Main calculation steps, one per line, for example '15 mg/kg x 70 kg = 1050 mg'.
+        medication: Medication name.
+        concentration: Concentration or strength of the stock used, with unit.
+        dose: Calculated dose, with unit.
+        administration: Volume or rate to administer, with unit.
+        steps: Main calculation steps, one per line.
     """
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
