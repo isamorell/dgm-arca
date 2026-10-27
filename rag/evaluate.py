@@ -50,6 +50,64 @@ def load_gold(path: str | Path) -> list[dict]:
         if line.strip()
     ]
 
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+def resolve_gold(gold: list[dict], chunks) -> list[dict]:
+    """Recompute ``relevant_chunk_ids`` for a given chunking.
+
+    Chunk ids change with the chunking strategy, so a gold set annotated with the ids of one
+    strategy is useless for the other. If an item has an ``evidence`` field (a verbatim
+    passage, or a list of them, copied from the corpus), the relevant chunks are the ones
+    whose text contains it. Items without ``evidence`` keep their ``relevant_chunk_ids``.
+    """
+    normalized = [(c.id, _norm(c.text)) for c in chunks]
+    resolved = []
+    for item in gold:
+        evidence = item.get("evidence")
+        if not evidence:
+            resolved.append(item)
+            continue
+        pieces = [_norm(p) for p in ([evidence] if isinstance(evidence, str) else evidence)]
+        ids = [cid for cid, text in normalized if any(p in text for p in pieces)]
+        resolved.append({**item, "relevant_chunk_ids": ids})
+    return resolved
+
+def failed_questions(retriever, gold: list[dict], k: int) -> list[dict]:
+    """Questions whose relevant chunk is not in the top k: material for your interpretation."""
+    failures = []
+    for item in gold:
+        ranked = [hit.chunk.id for hit in retriever.search(item["question"], top_k=k)]
+        if not set(ranked) & set(item["relevant_chunk_ids"]):
+            failures.append(
+                {
+                    "question": item["question"],
+                    "relevant": item["relevant_chunk_ids"],
+                    "retrieved": ranked,
+                }
+            )
+    return failures
+
+def print_report(report: dict, k: int) -> None:
+    key = f"recall@{k}"
+    for name, entry in report["chunking"].items():
+        s = entry["stats"]
+        print(f"\n=== chunking: {name} ===")
+        print(
+            f"{s['n_chunks']} chunks | mean {s['mean_chars']:.0f} chars "
+            f"(min {s['min_chars']}, max {s['max_chars']}) | "
+            f"{entry['n_unresolved']} gold questions without a matching chunk"
+        )
+        print(f"{'retriever':<10} {key:>10} {'mrr':>8} {'fallos':>8}")
+        for rname, m in entry["retrievers"].items():
+            n_fail = len(entry["failures"][rname])
+            print(f"{rname:<10} {m[key]:>10.3f} {m['mrr']:>8.3f} {n_fail:>8}")
+        print(f"\nBarrido de λ (peso de BM25) en hybrid, chunking {name}:")
+        print(f"{'λ':>5} {key:>10} {'mrr':>8}")
+        for lam, m in entry["lambda_sweep"].items():
+            print(f"{lam:>5} {m[key]:>10.3f} {m['mrr']:>8.3f}")
+        best = max(entry["lambda_sweep"].items(), key=lambda kv: (kv[1]["mrr"], kv[1][key]))
+        print(f"Mejor λ por MRR: {best[0]}")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -58,14 +116,70 @@ def main() -> None:
     parser.add_argument("--gold", default="rag/gold/example_gold.jsonl")
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--out", default="reports/phase3_eval.json")
+    parser.add_argument("--corpus", default="rag/corpus")
+    parser.add_argument("--index-dir", default="rag/index")
+    parser.add_argument("--threshold", type=float, default=0.25, help="semantic chunking")
+    parser.add_argument("--lam", type=float, default=0.5, help="λ of the hybrid in the main table")
     args = parser.parse_args()
     gold = load_gold(args.gold)
     print(f"{len(gold)} gold questions loaded; results will go to {args.out}")
 
     # Tu turno: build the three retrievers over your chunks (both chunking strategies!) and
     # call evaluate_retriever(retriever, gold, args.k) on each. Sweep λ for the hybrid one.
-    raise NotImplementedError("Build your retrievers here, then evaluate them on the gold set.")
+    from rag.chunking import describe, recursive_chunks, semantic_chunks
+    from rag.embed import Embedder
+    from rag.ingest import load_documents
+    from rag.retriever import BM25Retriever, DenseRetriever, HybridRetriever
 
+    documents = load_documents(args.corpus)
+    embedder = Embedder()
+    strategies = {
+        "recursive": recursive_chunks(documents),
+        "semantic": semantic_chunks(
+            documents, embedder.embed_passages, distance_threshold=args.threshold
+        ),
+    }
+    lambdas = [round(i / 10, 1) for i in range(11)]
+
+    report: dict = {
+        "k": args.k,
+        "gold": args.gold,
+        "threshold": args.threshold,
+        "chunking": {}
+    }
+
+    for name, chunks in strategies.items():
+        items = resolve_gold(gold, chunks)
+        usable = [it for it in items if it["relevant_chunks_ids"]]
+
+        bm25 = BM25Retriever(chunks)
+        dense = DenseRetriever(chunks, embedder, persist_dir=f"{args.index_dir}/{name}")
+        hybrid = HybridRetriever(bm25, dense, weight_bm25=args.lam)
+        retrievers = {"bm25": bm25, "dense": dense, "hybrid": hybrid}
+
+        entry: dict = {
+            "stats": describe(chunks),
+            "n_unresolved": len(items) - len(usable),
+            "retrievers": {},
+            "failures": {},
+            "lambda_sweep": {},
+        }
+
+        for rname, retriever in retrievers.items():
+            entry["retrievers"][rname] = evaluate_retriever(retriever, usable, args.k)
+            entry["failures"][rname] = failed_questions(retriever, usable, args.k)
+
+        for lam in lambdas:
+            hybrid.weight_bm25 = lam
+            entry["lambda_sweep"][str(lam)] = evaluate_retriever(hybrid, usable, args.k)
+        hybrid.weight_bm25 = args.lam
+        report["chunking"][name] = entry
+
+    print_report(report, args.k)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\nSaved to {out}")
 
 if __name__ == "__main__":
     main()

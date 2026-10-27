@@ -98,7 +98,7 @@ class RagPipeline:
             chunks = semantic_chunks(documents, embedder.embed_passages)
 
         bm25 = BM25Retriever(chunks)
-        dense = DenseRetriever(chunks, embedder)
+        dense = DenseRetriever(chunks, embedder, persist_dir=f"rag/index/{CHUNKING}")
         hybrid = HybridRetriever(bm25, dense, weight_bm25=LAMBDA_BM25)
         self.retrievers = {"bm25": bm25, "dense": dense, "hybrid": hybrid}
 
