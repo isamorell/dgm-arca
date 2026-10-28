@@ -76,7 +76,7 @@ Si el corpus ya ha sido generado y lo que queremos es volver a descargar los med
 
 `uv run python -m rag.download_corpus --from-manifest`
 
-En este modo se utilizan los números de registro CIMA almacenados en `rag/corpus_manifest.csv`, en lugar de realizar una nueva selección de medicamentos por principio activo.
+En este modo se utilizan los números de registro CIMA almacenados en `rag/corpus/corpus_manifest.csv`, en lugar de realizar una nueva selección de medicamentos por principio activo.
 
 Esto permite mantener la selección de medicamentos entre ejecuciones, aunque **no garantiza recuperar exactamente las mismas versiones históricas de las fichas técnicas**, ya que CIMA puede actualizar sus documentos.
 

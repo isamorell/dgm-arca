@@ -6,7 +6,7 @@ Para cada principio activo de la lista DRUGS:
     2. Descarga la ficha técnica segmentada (docSegmentado/contenido/1).
     3. Guarda el JSON crudo en  rag/raw/<nregistro>.json          (respaldo, fuera de corpus/)
     4. Guarda las secciones especificadas en SECTIONS limpias en  rag/corpus/<slug>_<nregistro>.md
-    5. Escribe rag/corpus_manifest.csv con exactamente qué medicamentos se han usado.
+    5. Escribe rag/corpus/corpus_manifest.csv con exactamente qué medicamentos se han usado.
 
 Reproducibilidad: CIMA cambia con el tiempo. Una vez generado el manifiesto, puedes
 volver a descargar los MISMOS medicamentos con:   python download_corpus.py --from-manifest
@@ -35,9 +35,9 @@ BASE = "https://cima.aemps.es/cima/rest"
 ROOT = Path(__file__).resolve().parent
 CORPUS_DIR = ROOT / "corpus"
 RAW_DIR = ROOT / "raw"
-MANIFEST = ROOT / "corpus_manifest.csv"
+MANIFEST = CORPUS_DIR / "corpus_manifest.csv"
 
-SECTIONS = ["2", "4.2", "6.2", "6.3", "6.4", "6.5", "6.6"]
+SECTIONS = ["2", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8", "4.9", "6.2", "6.3", "6.4", "6.5", "6.6"]
 PAUSE = 0.4
 
 # Vías que aceptamos como "parenterales" (se compara contra el nombre de la vía en CIMA)
@@ -245,6 +245,16 @@ def seccion_deseada(num):
     return any(num == w or num.startswith(w + ".") for w in SECTIONS)
 
 
+def clave_orden_seccion(seccion):
+    """Convierte '4.2.1' en una tupla numérica (4, 2, 1)."""
+    num = str(seccion.get("seccion", "")).strip()
+
+    try:
+        return tuple(int(parte) for parte in num.split("."))
+    except ValueError:
+        return (float("inf"),)
+
+
 def escribir_markdown(med, practiv, secciones):
     nreg = med["nregistro"]
     forma = (med.get("formaFarmaceutica") or {}).get("nombre", "")
@@ -265,7 +275,7 @@ def escribir_markdown(med, practiv, secciones):
         "",
     ]
     guardadas = []
-    for s in sorted(secciones, key=lambda s: s.get("orden", 0)):
+    for s in sorted(secciones, key=clave_orden_seccion):
         num = str(s.get("seccion", ""))
         if not seccion_deseada(num):
             continue
