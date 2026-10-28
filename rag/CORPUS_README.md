@@ -66,8 +66,6 @@ Cada documento Markdown incluye:
 - Fecha de descarga.
 - Contenido de las secciones seleccionadas.
 
-Además, cada sección incorpora el nombre del medicamento en su encabezado. Esto permite mantener el contexto farmacológico cuando el contenido se divide en chunks durante la ingesta del corpus.
-
 ## 4. Generación y actualización del corpus
 
 Para generar el corpus por primera vez, ejecutamos el siguiente comando:
@@ -89,4 +87,11 @@ Para probar el proceso con los primeros k principios activos, podemos ejecutar e
 Esta opción es útil para comprobar la conectividad con la API y validar el proceso de generación antes de construir el corpus completo.
 
 ## 5. Consideraciones legales y uso responsable
+
+Los documentos proceden de las fichas técnicas publicadas por CIMA (AEMPS). Antes de redistribuir el corpus o publicar sus contenidos, debe comprobarse el aviso legal vigente de la AEMPS y respetarse las condiciones aplicables a la reproducción de sus documentos.
+
 - [Aviso legal de la AEMPS](https://www.aemps.gob.es/avisoLegal/)
+
+Según lo establecido en la fecha de creación del corpus (28/10/2026), estamos autorizadas a reproducir total o parcialmente el contenido de la web, citando debidamente que la información procede de las fichas técnicas publicadas por CIMA. La fecha de actualización de la ficha y de descarga se pueden encontrar al comienzo de cada documento del corpus.
+
+El corpus está destinado a fines académicos y al desarrollo de un sistema RAG experimental.
