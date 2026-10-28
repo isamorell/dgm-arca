@@ -76,9 +76,9 @@ leyendo vuestro corpus, y con alguna que el corpus no puede responder, y miraré
 | Fichero | Estado | Qué es |
 |---|---|---|
 | `ingest.py` | hecho | Lee el corpus (PDF, MD, TXT, HTML) como `Document` con id y fuente |
-| `chunking.py` | hecho + tu turno | Recursivo hecho; semántico vuestro; estadísticas para la tabla |
+| `chunking.py` | hecho | Recursivo y semántico (por secciones, con cabecera opcional), estadísticas y gráfica de distancias: `uv run python -m rag.chunking` |
 | `embed.py` | hecho | Qwen3-Embedding con instrucción para consultas |
-| `retriever.py` | hecho + tu turno | BM25 hecho; denso e híbrido vuestros |
+| `retriever.py` | hecho | BM25, denso (matriz NumPy persistida en `index/`) e híbrido con λ ajustable |
 | `generate.py` | tu turno | Prompt aumentado, generación, citas; detrás de `/rag` |
 | `evaluate.py` | hecho + tu turno | Recall@k y MRR hechos; montar y comparar retrievers vuestro |
 | `corpus/`, `gold/`, `index/` | vuestros | Documentos, conjunto dorado, índice persistido |

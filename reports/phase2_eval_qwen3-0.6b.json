@@ -1,0 +1,1495 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "bench": "tool_use/bench/cases.jsonl",
+  "summary": {
+    "tools": {
+      "tool_selection_accuracy": 0.7333333333333333,
+      "argument_accuracy": 0.6333333333333333,
+      "n_cases": 30,
+      "argument_accuracy_ignoring_optional": 0.7,
+      "false_call_rate": 0.0,
+      "missed_call_rate": 0.08333333333333333,
+      "wrong_tool_rate": 0.25,
+      "sequence_accuracy": 0.0,
+      "answer_accuracy": 0.4,
+      "answer_accuracy_ci95": [
+        0.198,
+        0.643
+      ],
+      "n_answer_cases": 15,
+      "by_category": {
+        "calculo": {
+          "n": 7,
+          "selection": 0.14285714285714285,
+          "arguments": 0.14285714285714285
+        },
+        "cima": {
+          "n": 6,
+          "selection": 1.0,
+          "arguments": 0.8333333333333334
+        },
+        "conversion": {
+          "n": 5,
+          "selection": 0.6,
+          "arguments": 0.4
+        },
+        "encadenado": {
+          "n": 3,
+          "selection": 1.0,
+          "arguments": 0.6666666666666666
+        },
+        "hoja": {
+          "n": 3,
+          "selection": 1.0,
+          "arguments": 1.0
+        },
+        "sin_herramienta": {
+          "n": 6,
+          "selection": 1.0,
+          "arguments": 1.0
+        }
+      }
+    },
+    "no_tools": {
+      "answer_accuracy": 0.3333333333333333,
+      "answer_accuracy_ci95": [
+        0.152,
+        0.583
+      ],
+      "n_answer_cases": 15
+    },
+    "comparison": {
+      "n_cases": 15,
+      "correct_with_tools": 0.4,
+      "correct_without_tools": 0.3333333333333333,
+      "both_correct": 2,
+      "only_with_tools": 4,
+      "only_without_tools": 3,
+      "both_wrong": 6,
+      "only_with_tools_ids": [
+        "c08",
+        "c11",
+        "c12",
+        "c24"
+      ],
+      "only_without_tools_ids": [
+        "c13",
+        "c14",
+        "c15"
+      ]
+    }
+  },
+  "rows": {
+    "tools": [
+      {
+        "id": "c01",
+        "category": "cima",
+        "query": "¿Qué presentaciones de furosemida hay comercializadas en España?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "furosemida"
+        },
+        "expected_answer": null,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "furosemida",
+              "max_results": 5
+            },
+            "result": "- FUROSEMIDA CINFA 40 mg COMPRIMIDOS EFG | dose: 40 mg furosemida | form: COMPRIMIDO | routes: VÍA ORAL | registration: 64140\n- FUROSEMIDA PHYSAN 20mg/2ml SOLUCIÓN INYECTABLE EFG | dose: 20 mg | form: SOLUCIÓN INYECTABLE | routes: VÍA INTRAMUSCULAR, VÍA INTRAVENOSA | registration: 62168\n- FUROSEMIDA SANDOZ 40 mg COMPRIMIDOS EFG | dose: 40 mg furosemida | form: COMPRIMIDO | routes: VÍA ORAL | registration: 68077\n- FUROSEMIDA TECNIGEN 40 MG COMPRIMIDOS EFG | dose: 40 mg | form: COMPRIMIDO | routes: VÍA ORAL | registration: 86391\n- FUROSEMIDA UXA 40 MG COMPRIMIDOS EFG | dose: 40 MG | form: COMPRIMIDO | routes: VÍA ORAL | registration: 79029",
+            "ok": true,
+            "error": null,
+            "latency_ms": 466.38999693095684,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La presentación de furosemida comercializada en España incluyen:\n\n1. FUROSEMIDA CINFA 40 mg COMPRIMIDOS EFG  \n2. FUROSEMIDA PHYSAN 20mg/2ml SOLUCIÓN INYECTABLE EFG  \n3. FUROSEMIDA SANDOZ 40 mg COMPRIMIDOS EFG  \n4. FUROSEMIDA TECNIGEN 40 MG COMPRIMIDO EFG  \n5. FUROSEMIDA UXA 40 MG COMPRIMIDO EFG  \n\nCada presentación incluye el nombre del medicamento, la cantidad de activa ingredientes por unidad, el formulario y la ruta de administración.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c02",
+        "category": "cima",
+        "query": "Necesito saber en qué dosis existe el ibuprofeno en el mercado español.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "ibuprofeno"
+        },
+        "expected_answer": null,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "ibuprofeno"
+            },
+            "result": "- ANTIDOL DUAL 500 MG/200 MG COMPRIMIDOS RECUBIERTOS CON PELÍCULA | dose: 500 mg/200 mg | form: COMPRIMIDO RECUBIERTO CON PELÍCULA | routes: VÍA ORAL | registration: 89654\n- ATRISCAL 300 mg COMPRIMIDOS RECUBIERTOS CON PELICULA | dose: 300 mg | form: COMPRIMIDO RECUBIERTO CON PELÍCULA | routes: VÍA ORAL | registration: 63607\n- ATRISCAL 400 mg COMPRIMIDOS RECUBIERTOS CON PELICULA | dose: 400 mg | form: COMPRIMIDO RECUBIERTO CON PELÍCULA | routes: VÍA ORAL | registration: 63606\n- DIFENADOL RAPID 400 mg GRANULADO PARA SOLUCION ORAL | dose: 400 mg | form: GRANULADO PARA SOLUCIÓN ORAL | routes: VÍA ORAL | registration: 74559\n- DIFENADOL 400 MG COMPRIMIDOS RECUBIERTOS CON PELICULA | dose: 400 mg | form: COMPRIMIDO RECUBIERTO CON PELÍCULA | routes: VÍA ORAL | registration: 88314",
+            "ok": true,
+            "error": null,
+            "latency_ms": 1605.8875983580947,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "El ibuprofeno en el mercado español está disponible en dosis de 500 mg/200 mg, 300 mg, 400 mg y 400 mg.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c03",
+        "category": "cima",
+        "query": "Busca en CIMA la amoxicilina, pero dame solo 3 presentaciones.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "amoxicilina",
+          "max_results": 3
+        },
+        "expected_answer": null,
+        "notes": "Único caso de CIMA con max_results explícito.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "amoxicilina",
+              "max_results": 3
+            },
+            "result": "- AMOXICILINA / ACIDO CLAVULANICO SANDOZ 250 mg/62,5 mg/5 ml POLVO PARA SUSPENSION ORAL EFG | dose: 250 mg amoxicilina/62,5 mg acido clavulanico | form: POLVO PARA SUSPENSIÓN ORAL | routes: VÍA ORAL | registration: 62800\n- AMOXICILINA CINFA 1000 MG COMPRIMIDOS EFG | dose: 1000 mg | form: COMPRIMIDO | routes: VÍA ORAL | registration: 62880\n- AMOXICILINA CINFA 1000 MG POLVO PARA SUSPENSIÓN ORAL EN SOBRES EFG | dose: 1000 mg | form: POLVO PARA SUSPENSIÓN ORAL | routes: VÍA ORAL | registration: 64117",
+            "ok": true,
+            "error": null,
+            "latency_ms": 468.714470975101,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "- AMOXICILINA / ACIDO CLAVULANICO SANDOZ 250 mg/62,5 mg/5 ml POLVO PARA SUSPENSIÓN ORAL EFG  \n- AMOXICILINA CINFA 1000 MG COMPRIMIDOS EFG  \n- AMOXICILINA CINFA 1000 MG POLVO PARA SUSPENSIÓN ORAL EN SOBRES EFG",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c04",
+        "category": "cima",
+        "query": "Voy a administrar enoxaparina. ¿Qué presentaciones hay y en qué forma farmacéutica vienen?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "enoxaparina"
+        },
+        "expected_answer": null,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "enoxaparina"
+            },
+            "result": "- ENOXAPARINA ROVI 10.000 UI (100 MG)/1 ML SOLUCION INYECTABLE EN JERINGA PRECARGADA | dose: 100 mg/ml | form: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA | routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA | registration: 82490\n- ENOXAPARINA ROVI 12.000 UI (120 MG)/0,8 ML SOLUCION INYECTABLE EN JERINGA PRECARGADA | dose: 120 mg/0,8 ml | form: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA | routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA | registration: 82492\n- ENOXAPARINA ROVI 15.000 UI (150 MG)/1 ML SOLUCION INYECTABLE EN JERINGA PRECARGADA | dose: 150 mg/ml | form: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA | routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA | registration: 82491\n- ENOXAPARINA ROVI 2.000 UI (20 MG)/0,2 ML SOLUCION INYECTABLE EN JERINGA PRECARGADA | dose: 20 mg/0,2 ml | form: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA | routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA | registration: 82496\n- ENOXAPARINA ROVI 4.000 UI (40 MG)/0,4 ML SOLUCION INYECTABLE EN JERINGA PRECARGADA | dose: 40 mg/0,4 ml | form: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA | routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA | registration: 82495",
+            "ok": true,
+            "error": null,
+            "latency_ms": 370.9478434175253,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La presentación de enoxaparina incluye:\n\n- **ENOXAPARINA ROVI 10.000 UI (100 MG)/1 ML SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA**  \n  - Dosis: 100 mg/ml  \n  - Forma: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA  \n  - Routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA  \n  - Registro: 82490\n\n- **ENOXAPARINA ROVI 12.000 UI (120 MG)/0,8 ML SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA**  \n  - Dosis: 120 mg/0,8 ml  \n  - Forma: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA  \n  - Routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA  \n  - Registro: 82492\n\n- **ENOXAPARINA ROVI 15.000 UI (150 MG)/1 ML SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA**  \n  - Dosis: 150 mg/ml  \n  - Forma: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA  \n  - Routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA  \n  - Registro: 82491\n\n- **ENOXAPARINA ROVI 2.000 UI (20 MG)/0,2 ML SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA**  \n  - Dosis: 20 mg/0,2 ml  \n  - Forma: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA  \n  - Routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA  \n  - Registro: 82496\n\n- **ENOXAPARINA ROVI 4.000 UI (40 MG)/0,4 ML SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA**  \n  - Dosis: 40 mg/0,4 ml  \n  - Forma: SOLUCIÓN INYECTABLE EN JERINGA PRECARGADA  \n  - Routes: HEMODIÁLISIS, VÍA INTRAVENOSA, VÍA SUBCUTÁNEA  \n  - Registro: 82495",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c05",
+        "category": "cima",
+        "query": "¿Qué presentación intravenosa de paracetamol hay en el mercado?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "paracetamol"
+        },
+        "expected_answer": null,
+        "notes": "Caso de la limitación anotada en EXPERIMENTS: las 10 primeras presentaciones de paracetamol son orales. Mide si el fallo se nota; la selección y los argumentos son correctos aunque la respuesta final no lo sea.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "paracetamol",
+              "max_results": 1
+            },
+            "result": "- ACTRON COMPUESTO 267 MG/133 MG/40 MG COMPRIMIDOS EFERVESCENTES | dose: 267 mg/40 mg/133 mg | form: COMPRIMIDO EFERVESCENTE | routes: VÍA ORAL | registration: 47178",
+            "ok": true,
+            "error": null,
+            "latency_ms": 2765.5455488711596,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La presentación intravenosa de paracetamol en el mercado es: **ACTRON COMPUESTO 267 MG/133 MG/40 MG COMPRIMIDOS EFERVESCENTES**.",
+        "selection_ok": true,
+        "arguments_ok": false,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c06",
+        "category": "cima",
+        "query": "oye, q presentaciones tiene el omeprazol en cima?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "omeprazol"
+        },
+        "expected_answer": null,
+        "notes": "Registro informal y abreviaturas.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "omeprazol"
+            },
+            "result": "- AXIAGO 20 mg COMPRIMIDOS GASTRORRESISTENTES | dose: 20 mg esomeprazol | form: COMPRIMIDO GASTRORRESISTENTE | routes: VÍA ORAL | registration: 63940\n- AXIAGO 40 mg COMPRIMIDOS GASTRORRESISTENTES | dose: 40 mg esomeprazol | form: COMPRIMIDO GASTRORRESISTENTE | routes: VÍA ORAL | registration: 63944\n- ESOMEPRAZOL CINFA 20 MG CAPSULAS DURAS GASTRORRESISTENTES EFG | dose: 20 mg | form: CÁPSULA DURA GASTRORRESISTENTE | routes: VÍA ORAL | registration: 82921\n- ESOMEPRAZOL CINFA 20 mg COMPRIMIDOS GASTRORRESISTENTES EFG | dose: 20 mg | form: COMPRIMIDO GASTRORRESISTENTE | routes: VÍA ORAL | registration: 75071\n- ESOMEPRAZOL CINFA 40 MG CAPSULAS DURAS GASTRORRESISTENTES EFG | dose: 40 mg | form: CÁPSULA DURA GASTRORRESISTENTE | routes: VÍA ORAL | registration: 82922",
+            "ok": true,
+            "error": null,
+            "latency_ms": 615.9796407446265,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "El omeprazol en cima (es decir, el medicamento con el nombre \"omeprazol\") tiene varias presentaciones disponibles. Algunas son:\n\n1. **AXIAGO 20 mg COMPRIMIDOS GASTRORRESISTENTES**  \n2. **AXIAGO 40 mg COMPRIMIDOS GASTRORRESISTENTES**  \n3. **ESOMEPRAZOL CINFA 20 MG CAPSULAS DURAS GASTRORRESISTENTES EFG**  \n4. **ESOMEPRAZOL CINFA 20 mg COMPRIMIDOS GASTRORRESISTENTES EFG**  \n5. **ESOMEPRAZOL CINFA 40 MG CAPSULAS DURAS GASTRORRESISTENTES EFG**\n\n¿Quieres más información sobre alguna de estas presentaciones?",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c07",
+        "category": "conversion",
+        "query": "Convierte 0,5 g a mg.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 0.5,
+          "from_unit": "g",
+          "to_unit": "mg"
+        },
+        "expected_answer": 500,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": 0.5,
+              "from_unit": "g",
+              "to_unit": "mg"
+            },
+            "result": 500.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 159.2759983614087,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "0,5 g es igual a 500.0 mg.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": true,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c08",
+        "category": "conversion",
+        "query": "¿Cuántos mg son 250 mcg?",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 250,
+          "from_unit": "mcg",
+          "to_unit": "mg"
+        },
+        "expected_answer": 0.25,
+        "notes": "Usa el alias mcg definido en tools.py.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "250 mcg es igual a 0.25 mg.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": true,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c09",
+        "category": "conversion",
+        "query": "Tengo 1,5 litros de suero, ¿cuántos mL son?",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 1.5,
+          "from_unit": "L",
+          "to_unit": "mL"
+        },
+        "expected_answer": 1500,
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "1,5 litros es igual a 1500 mL.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": true,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c10",
+        "category": "conversion",
+        "query": "Pasa 100 mL/h a mL/min.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 100,
+          "from_unit": "mL/h",
+          "to_unit": "mL/min"
+        },
+        "expected_answer": 1.67,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": 100,
+              "from_unit": "L",
+              "to_unit": "mL"
+            },
+            "result": 100000.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.6031151860952377,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "100 mL/min.",
+        "selection_ok": true,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c11",
+        "category": "conversion",
+        "query": "Convierte 5 mg/kg a mg/lb.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 5,
+          "from_unit": "mg/kg",
+          "to_unit": "mg/lb"
+        },
+        "expected_answer": 2.27,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": 5,
+              "from_unit": "mg/kg",
+              "to_unit": "mg/lb"
+            },
+            "result": 2.2679618500000003,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.4927888512611389,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "5 mg/kg is approximately 2.26796185 mg/lb.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": true,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c12",
+        "category": "calculo",
+        "query": "Paciente de 70 kg con una pauta de 15 mg/kg. ¿Qué dosis le corresponde?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "15 * 70"
+        },
+        "expected_answer": 1050,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "dose_calculator",
+            "arguments": {
+              "expression": "15 * 70",
+              "decimals": 2
+            },
+            "result": 1050.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.27465540915727615,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La dosis del paciente es de 1050 mg.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": true,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c13",
+        "category": "calculo",
+        "query": "Tengo que dar 1000 mg de paracetamol y la solución es de 10 mg/mL. ¿Cuántos mL son?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "1000 / 10"
+        },
+        "expected_answer": 100,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "1000 mg",
+              "from_unit": "mg",
+              "to_unit": "mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "invalid arguments: [{'type': 'float_parsing', 'loc': ('value',), 'msg': 'Input should be a valid number, unable to parse string as a number', 'input': '1000 mg'}]",
+            "latency_ms": 0.05655083805322647,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "The value \"1000 mg\" is already in the correct format for the conversion. No further action is needed. \n\nIf you have any more questions or need further assistance, feel free to ask!",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c14",
+        "category": "calculo",
+        "query": "Prescripción de 0,5 mg/kg para un niño de 12 kg y el vial tiene 2,5 mg/mL. ¿Cuántos mL preparo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "(0.5 * 12) / 2.5"
+        },
+        "expected_answer": 2.4,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "0.5",
+              "from_unit": "mg",
+              "to_unit": "mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "ValueError: cannot convert 'mg' to 'mL': different kinds of unit",
+            "latency_ms": 0.27045421302318573,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La conversión de unidades falló porque 'mg' y 'mL' son unidades diferentes. Por favor, asegúrate de que las unidades sean compatibles para la conversión.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c15",
+        "category": "calculo",
+        "query": "Una perfusión de 500 mL tiene que pasar en 8 horas. ¿A cuántos mL/h la programo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "500 / 8"
+        },
+        "expected_answer": 62.5,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "500",
+              "from_unit": "L",
+              "to_unit": "mL"
+            },
+            "result": 500000.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.16488879919052124,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La programo a 500000 mL/h.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c16",
+        "category": "calculo",
+        "query": "Perfusión de 500 mL en 8 horas, ¿a cuántos mL/min va?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "500 / (8 * 60)"
+        },
+        "expected_answer": 1.04,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "500",
+              "from_unit": "L",
+              "to_unit": "mL"
+            },
+            "result": 500000.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.14904513955116272,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "El flujo de 500 mL en 8 horas es de **500000 mL/min**.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c17",
+        "category": "calculo",
+        "query": "Debo administrar 40 mg de furosemida y la ampolla trae 20 mg en 2 mL. ¿Cuántos mL cargo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "(40 / 20) * 2"
+        },
+        "expected_answer": 4,
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "20 mg",
+              "from_unit": "mg",
+              "to_unit": "mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "invalid arguments: [{'type': 'float_parsing', 'loc': ('value',), 'msg': 'Input should be a valid number, unable to parse string as a number', 'input': '20 mg'}]",
+            "latency_ms": 0.038419850170612335,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "The calculation is correct. The amount of medication you administered is 20 mg. Therefore, you administered **20 mL**.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c18",
+        "category": "calculo",
+        "query": "Necesito 490 mg y la concentración es de 11,75 mg/mL. ¿Cuántos mL salen?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "490 / 11.75"
+        },
+        "expected_answer": 41.7,
+        "notes": "Es la división que el modelo de la fase 1 calculaba mal (41,2 en lugar de 41,7). Con decimals por defecto (2) el resultado es 41.70.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "490",
+              "from_unit": "mg",
+              "to_unit": "mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "ValueError: cannot convert 'mg' to 'mL': different kinds of unit",
+            "latency_ms": 0.15484075993299484,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La concentración es de 11,75 mg/mL, por lo que para obtener 490 mg, necesitarás:\n\n$$\n\\frac{490 \\text{ mg}}{11.75 \\text{ mg/mL}} \\approx 41.47 \\text{ mL}\n$$\n\nPor lo tanto, saldrán **41.47 mL**.",
+        "selection_ok": false,
+        "arguments_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": false
+      },
+      {
+        "id": "c19",
+        "category": "hoja",
+        "query": "Hazme la hoja de preparación del paracetamol: concentración 10 mg/mL, dosis 1000 mg y administrar 100 mL. Cálculo: 1000 mg / 10 mg/mL = 100 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Paracetamol",
+          "concentration": "10 mg/mL",
+          "dose": "1000 mg",
+          "administration": "100 mL",
+          "steps": "1000 mg / 10 mg/mL = 100 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "notes": "steps es texto libre: no se puede comparar literalmente.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "create_preparation_sheet",
+            "arguments": {
+              "medication": "paracetamol",
+              "concentration": "10 mg/mL",
+              "dose": "1000 mg",
+              "administration": "100 mL",
+              "steps": "1000 mg / 10 mg/mL = 100 mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "this tool has side effects and requires user confirmation; it was NOT executed. Ask the user to confirm.",
+            "latency_ms": 0.0,
+            "requires_confirmation": true
+          }
+        ],
+        "answer": "Por favor, confirme que quiere que la hoja de preparación del paracetamol sea creada.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c20",
+        "category": "hoja",
+        "query": "Genera el PDF de preparación de la furosemida: ampolla de 10 mg/mL, dosis de 40 mg, administrar 4 mL. Cálculo: 40 mg / 10 mg/mL = 4 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Furosemida",
+          "concentration": "10 mg/mL",
+          "dose": "40 mg",
+          "administration": "4 mL",
+          "steps": "40 mg / 10 mg/mL = 4 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "create_preparation_sheet",
+            "arguments": {
+              "medication": "furosemida",
+              "concentration": "10 mg/mL",
+              "dose": "40 mg",
+              "administration": "4 mL",
+              "steps": "40 mg / 10 mg/mL = 4 mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "this tool has side effects and requires user confirmation; it was NOT executed. Ask the user to confirm.",
+            "latency_ms": 0.0,
+            "requires_confirmation": true
+          }
+        ],
+        "answer": "Por favor, confirme que desea generar el PDF de la preparación de la furosemida.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c21",
+        "category": "hoja",
+        "query": "Prepárame la hoja de la amoxicilina en suspensión de 250 mg/5 mL: dosis de 500 mg, 10 mL. Cálculo: 500 mg / (250 mg / 5 mL) = 10 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Amoxicilina",
+          "concentration": "250 mg/5 mL",
+          "dose": "500 mg",
+          "administration": "10 mL",
+          "steps": "500 mg / (250 mg / 5 mL) = 10 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "create_preparation_sheet",
+            "arguments": {
+              "medication": "Amoxicilina",
+              "concentration": "250 mg/5 mL",
+              "dose": "500 mg",
+              "administration": "10 mL",
+              "steps": "500 mg / (250 mg / 5 mL) = 10 mL"
+            },
+            "result": null,
+            "ok": false,
+            "error": "this tool has side effects and requires user confirmation; it was NOT executed. Ask the user to confirm.",
+            "latency_ms": 0.0,
+            "requires_confirmation": true
+          }
+        ],
+        "answer": "Por favor, confirme que quiere preparar la hoja de la amoxicilina en suspensión de 250 mg/5 mL con dosis de 500 mg y administración de 10 mL.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c22",
+        "category": "encadenado",
+        "query": "Busca la furosemida inyectable en CIMA y dime cuántos mL necesito para dar 40 mg.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "furosemida"
+        },
+        "expected_answer": 4,
+        "expected_sequence": [
+          "search_medication_cima",
+          "dose_calculator"
+        ],
+        "notes": "La respuesta (4 mL) depende de la presentación de 20 mg/2 mL que devuelve CIMA hoy; revisar la fecha si CIMA cambia.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "furosemida",
+              "max_results": 1
+            },
+            "result": "- FUROSEMIDA CINFA 40 mg COMPRIMIDOS EFG | dose: 40 mg furosemida | form: COMPRIMIDO | routes: VÍA ORAL | registration: 64140",
+            "ok": true,
+            "error": null,
+            "latency_ms": 58.66689886897802,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La furosemida enyectable necesitamos **40 mL** para dar 40 mg.",
+        "selection_ok": true,
+        "arguments_ok": false,
+        "sequence_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c23",
+        "category": "encadenado",
+        "query": "La ampolla de digoxina trae 500 mcg en 2 mL y la dosis pautada es de 0,25 mg. Pasa primero la dosis a mcg y luego dime cuántos mL cargo.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 0.25,
+          "from_unit": "mg",
+          "to_unit": "mcg"
+        },
+        "expected_answer": 1,
+        "expected_sequence": [
+          "convert_units",
+          "dose_calculator"
+        ],
+        "notes": "Cadena conversión y cálculo (250 mcg, después 250 / 500 * 2 = 1 mL). La petición pide la conversión primero para que la primera llamada no sea ambigua.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "convert_units",
+            "arguments": {
+              "value": "0.25",
+              "from_unit": "mg",
+              "to_unit": "mcg"
+            },
+            "result": 250.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.3484543412923813,
+            "requires_confirmation": false
+          },
+          {
+            "name": "search_medication_cima",
+            "arguments": {
+              "active_ingredient": "digoxina",
+              "max_results": 1
+            },
+            "result": "- DIGOXINA KERN PHARMA 0,25 mg COMPRIMIDOS | dose: 0,25 mg | form: COMPRIMIDO | routes: VÍA ORAL | registration: 34566",
+            "ok": true,
+            "error": null,
+            "latency_ms": 462.9216743633151,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "Pasa primero la dosis a mcg: 0,25 mg = 250 mcg. Luego, cargo 2 mL.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "sequence_ok": false,
+        "answer_ok": false,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c24",
+        "category": "encadenado",
+        "query": "Calcula la dosis de ibuprofeno para un niño de 25 kg a 10 mg/kg y hazme la hoja de preparación con la suspensión de 20 mg/mL.",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "10 * 25"
+        },
+        "expected_answer": 12.5,
+        "expected_sequence": [
+          "dose_calculator",
+          "dose_calculator",
+          "create_preparation_sheet"
+        ],
+        "notes": "Cadena: dosis (250 mg), después los mL (12,5 mL) y por último la hoja. expected_answer es el volumen final.",
+        "condition": "tools",
+        "tool_calls": [
+          {
+            "name": "dose_calculator",
+            "arguments": {
+              "expression": "10 * 25",
+              "decimals": 2
+            },
+            "result": 250.0,
+            "ok": true,
+            "error": null,
+            "latency_ms": 0.1278948038816452,
+            "requires_confirmation": false
+          }
+        ],
+        "answer": "La dosis de ibuprofeno es de 250.0 mg. \n\nLa hoja de preparación con la suspensión de 20 mg/mL es:\n\n1. 10 mg/kg x 25 kg = 250 mg  \n2. 250 mg / 20 mg/mL = 12,5 mL",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "sequence_ok": false,
+        "answer_ok": true,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c25",
+        "category": "sin_herramienta",
+        "query": "¿Qué significa que un fármaco se administre por vía intravenosa?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "Un fármaco se administre por vía intravenosa cuando se administra directamente en la sangre, por lo que se utiliza un vaso de administración (como un vaso de solución) para transferir el fármaco a la sangre.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c26",
+        "category": "sin_herramienta",
+        "query": "¿Cuál es la diferencia entre dosis y concentración?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "La diferencia entre dosis y concentración es que la **dosis** es la cantidad de medicamento que se administra a un paciente, mientras que la **concentración** indica la cantidad de medicamento por unidad de volumen o peso. Por ejemplo, una concentración de 10 mg/mL significa que hay 10 mg de medicamento por cada 1 mL de solución.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c27",
+        "category": "sin_herramienta",
+        "query": "¿Para qué sirve el paracetamol?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Tentador: menciona un fármaco pero no pide presentaciones ni datos de CIMA.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "El paracetamol sirve para reducir la fiebre, aliviar el dolor y aliviar el estreñimiento.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c28",
+        "category": "sin_herramienta",
+        "query": "¿Qué significa la abreviatura mcg en una prescripción?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría sobre una abreviatura; ninguna herramienta responde a esto.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "La abreviatura **mcg** (milligramos por cada gota) se usa para indicar la cantidad de medicamento en una gota, generalmente en una solución oral.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c29",
+        "category": "sin_herramienta",
+        "query": "Hola, ¿me puedes ayudar con un problema de enfermería?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Conversación.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "Hola! Si tienes un problema de enfermería, ¡por favor, explica lo que necesitas ayuda con!",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      },
+      {
+        "id": "c30",
+        "category": "sin_herramienta",
+        "query": "Explícame con tus palabras qué es una perfusión continua.",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "tools",
+        "tool_calls": [],
+        "answer": "Una perfusión continua es un tipo de administración de medicamentos que se realiza de manera constante, es decir, sin interrupciones regulares. Se utiliza en situaciones médicas donde el paciente necesita recibir una dosis constante de un medicamento, como en el caso de una enfermedad crónica o un tratamiento prolongado.",
+        "selection_ok": true,
+        "arguments_ok": true,
+        "answer_ok": null,
+        "arguments_lenient_ok": true
+      }
+    ],
+    "no_tools": [
+      {
+        "id": "c01",
+        "category": "cima",
+        "query": "¿Qué presentaciones de furosemida hay comercializadas en España?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "furosemida"
+        },
+        "expected_answer": null,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La furosemida comercializada en España incluye presentaciones en forma de tabletas,丸, y comprimidos.",
+        "answer_ok": null
+      },
+      {
+        "id": "c02",
+        "category": "cima",
+        "query": "Necesito saber en qué dosis existe el ibuprofeno en el mercado español.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "ibuprofeno"
+        },
+        "expected_answer": null,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "El ibuprofeno en el mercado español tiene una dosis recomendada de 400 mg por día.",
+        "answer_ok": null
+      },
+      {
+        "id": "c03",
+        "category": "cima",
+        "query": "Busca en CIMA la amoxicilina, pero dame solo 3 presentaciones.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "amoxicilina",
+          "max_results": 3
+        },
+        "expected_answer": null,
+        "notes": "Único caso de CIMA con max_results explícito.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "1. **Amoxicilina (Amoxicillin)** – 500 mg, 200 mg, 100 mg.  \n2. **Amoxicilina (Amoxicillin)** – 500 mg, 200 mg, 100 mg.  \n3. **Amoxicilina (Amoxicillin)** – 500 mg, 200 mg, 100 mg.",
+        "answer_ok": null
+      },
+      {
+        "id": "c04",
+        "category": "cima",
+        "query": "Voy a administrar enoxaparina. ¿Qué presentaciones hay y en qué forma farmacéutica vienen?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "enoxaparina"
+        },
+        "expected_answer": null,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La presentación de enoxaparina es en forma de solución o tabletas, y su farmacéutica es enoxaparina.",
+        "answer_ok": null
+      },
+      {
+        "id": "c05",
+        "category": "cima",
+        "query": "¿Qué presentación intravenosa de paracetamol hay en el mercado?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "paracetamol"
+        },
+        "expected_answer": null,
+        "notes": "Caso de la limitación anotada en EXPERIMENTS: las 10 primeras presentaciones de paracetamol son orales. Mide si el fallo se nota; la selección y los argumentos son correctos aunque la respuesta final no lo sea.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La presentación intravenosa de paracetamol en el mercado incluye diferentes formas como tabletas, vasoideos y solución intravénica.",
+        "answer_ok": null
+      },
+      {
+        "id": "c06",
+        "category": "cima",
+        "query": "oye, q presentaciones tiene el omeprazol en cima?",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "omeprazol"
+        },
+        "expected_answer": null,
+        "notes": "Registro informal y abreviaturas.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "El omeprazol está en cima en las presentaciones de la medicina.",
+        "answer_ok": null
+      },
+      {
+        "id": "c07",
+        "category": "conversion",
+        "query": "Convierte 0,5 g a mg.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 0.5,
+          "from_unit": "g",
+          "to_unit": "mg"
+        },
+        "expected_answer": 500,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "0,5 g = 500 mg.",
+        "answer_ok": true
+      },
+      {
+        "id": "c08",
+        "category": "conversion",
+        "query": "¿Cuántos mg son 250 mcg?",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 250,
+          "from_unit": "mcg",
+          "to_unit": "mg"
+        },
+        "expected_answer": 0.25,
+        "notes": "Usa el alias mcg definido en tools.py.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "250 mg es igual a 250,000 mcg.",
+        "answer_ok": false
+      },
+      {
+        "id": "c09",
+        "category": "conversion",
+        "query": "Tengo 1,5 litros de suero, ¿cuántos mL son?",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 1.5,
+          "from_unit": "L",
+          "to_unit": "mL"
+        },
+        "expected_answer": 1500,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "1,5 litros son 1500 mL.",
+        "answer_ok": true
+      },
+      {
+        "id": "c10",
+        "category": "conversion",
+        "query": "Pasa 100 mL/h a mL/min.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 100,
+          "from_unit": "mL/h",
+          "to_unit": "mL/min"
+        },
+        "expected_answer": 1.67,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "100 mL/h = 100 mL/min.",
+        "answer_ok": false
+      },
+      {
+        "id": "c11",
+        "category": "conversion",
+        "query": "Convierte 5 mg/kg a mg/lb.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 5,
+          "from_unit": "mg/kg",
+          "to_unit": "mg/lb"
+        },
+        "expected_answer": 2.27,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "5 mg/kg a mg/lb.",
+        "answer_ok": false
+      },
+      {
+        "id": "c12",
+        "category": "calculo",
+        "query": "Paciente de 70 kg con una pauta de 15 mg/kg. ¿Qué dosis le corresponde?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "15 * 70"
+        },
+        "expected_answer": 1050,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La dosis del paciente es 15 mg/kg.",
+        "answer_ok": false
+      },
+      {
+        "id": "c13",
+        "category": "calculo",
+        "query": "Tengo que dar 1000 mg de paracetamol y la solución es de 10 mg/mL. ¿Cuántos mL son?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "1000 / 10"
+        },
+        "expected_answer": 100,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "1000 mg de paracetamol en una solución de 10 mg/mL es igual a 100 mL.",
+        "answer_ok": true
+      },
+      {
+        "id": "c14",
+        "category": "calculo",
+        "query": "Prescripción de 0,5 mg/kg para un niño de 12 kg y el vial tiene 2,5 mg/mL. ¿Cuántos mL preparo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "(0.5 * 12) / 2.5"
+        },
+        "expected_answer": 2.4,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "El vial tiene 2,5 mg/mL, y el prescripción es 0,5 mg/kg. Para un niño de 12 kg, el volumen a preparar es:\n\n$$\n0,5 \\, \\text{mg/kg} \\times 12 \\, \\text{kg} = 6 \\, \\text{mg}\n$$\n\nDividiendo por el peso en mg/mL:\n\n$$\n6 \\, \\text{mg} \\div 2,5 \\, \\text{mg/mL} = 2,4 \\, \\text{mL}\n$$\n\nPor lo tanto, prepara **2,4 mL**.",
+        "answer_ok": true
+      },
+      {
+        "id": "c15",
+        "category": "calculo",
+        "query": "Una perfusión de 500 mL tiene que pasar en 8 horas. ¿A cuántos mL/h la programo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "500 / 8"
+        },
+        "expected_answer": 62.5,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La programación es de 500 mL en 8 horas, por lo tanto, la velocidad es 500 mL / 8 horas = 62,5 mL/h.",
+        "answer_ok": true
+      },
+      {
+        "id": "c16",
+        "category": "calculo",
+        "query": "Perfusión de 500 mL en 8 horas, ¿a cuántos mL/min va?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "500 / (8 * 60)"
+        },
+        "expected_answer": 1.04,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La perfusión de 500 mL en 8 horas va a ser de **62.5 mL/min**.",
+        "answer_ok": false
+      },
+      {
+        "id": "c17",
+        "category": "calculo",
+        "query": "Debo administrar 40 mg de furosemida y la ampolla trae 20 mg en 2 mL. ¿Cuántos mL cargo?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "(40 / 20) * 2"
+        },
+        "expected_answer": 4,
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La cantidad de mL que cargo es 2 mL.",
+        "answer_ok": false
+      },
+      {
+        "id": "c18",
+        "category": "calculo",
+        "query": "Necesito 490 mg y la concentración es de 11,75 mg/mL. ¿Cuántos mL salen?",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "490 / 11.75"
+        },
+        "expected_answer": 41.7,
+        "notes": "Es la división que el modelo de la fase 1 calculaba mal (41,2 en lugar de 41,7). Con decimals por defecto (2) el resultado es 41.70.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "Para calcular el volumen necesario, dividimos el peso en gramos entre la concentración en mg/mL:\n\n$$\n\\frac{490 \\, \\text{mg}}{11.75 \\, \\text{mg/mL}} \\approx 41.75 \\, \\text{mL}\n$$\n\nPor lo tanto, el volumen necesario es **41.75 mL**.",
+        "answer_ok": false
+      },
+      {
+        "id": "c19",
+        "category": "hoja",
+        "query": "Hazme la hoja de preparación del paracetamol: concentración 10 mg/mL, dosis 1000 mg y administrar 100 mL. Cálculo: 1000 mg / 10 mg/mL = 100 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Paracetamol",
+          "concentration": "10 mg/mL",
+          "dose": "1000 mg",
+          "administration": "100 mL",
+          "steps": "1000 mg / 10 mg/mL = 100 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "notes": "steps es texto libre: no se puede comparar literalmente.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La hoja de preparación del paracetamol es:\n\n- **Concentración:** 10 mg/mL  \n- **Dosis:** 1000 mg  \n- **Volumen:** 100 mL  \n\n**Cálculo:**  \n1000 mg / 10 mg/mL = 100 mL.",
+        "answer_ok": null
+      },
+      {
+        "id": "c20",
+        "category": "hoja",
+        "query": "Genera el PDF de preparación de la furosemida: ampolla de 10 mg/mL, dosis de 40 mg, administrar 4 mL. Cálculo: 40 mg / 10 mg/mL = 4 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Furosemida",
+          "concentration": "10 mg/mL",
+          "dose": "40 mg",
+          "administration": "4 mL",
+          "steps": "40 mg / 10 mg/mL = 4 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "El PDF de preparación de la furosemida es generado con la información proporcionada.",
+        "answer_ok": null
+      },
+      {
+        "id": "c21",
+        "category": "hoja",
+        "query": "Prepárame la hoja de la amoxicilina en suspensión de 250 mg/5 mL: dosis de 500 mg, 10 mL. Cálculo: 500 mg / (250 mg / 5 mL) = 10 mL.",
+        "needs_tool": true,
+        "expected_tool": "create_preparation_sheet",
+        "expected_arguments": {
+          "medication": "Amoxicilina",
+          "concentration": "250 mg/5 mL",
+          "dose": "500 mg",
+          "administration": "10 mL",
+          "steps": "500 mg / (250 mg / 5 mL) = 10 mL"
+        },
+        "expected_answer": null,
+        "free_text_args": [
+          "steps"
+        ],
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La hoja de la amoxicilina en suspensión de 250 mg/5 mL con dosis de 500 mg y 10 mL se prepara como sigue: 500 mg / (250 mg / 5 mL) = 10 mL.",
+        "answer_ok": null
+      },
+      {
+        "id": "c22",
+        "category": "encadenado",
+        "query": "Busca la furosemida inyectable en CIMA y dime cuántos mL necesito para dar 40 mg.",
+        "needs_tool": true,
+        "expected_tool": "search_medication_cima",
+        "expected_arguments": {
+          "active_ingredient": "furosemida"
+        },
+        "expected_answer": 4,
+        "expected_sequence": [
+          "search_medication_cima",
+          "dose_calculator"
+        ],
+        "notes": "La respuesta (4 mL) depende de la presentación de 20 mg/2 mL que devuelve CIMA hoy; revisar la fecha si CIMA cambia.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La furosemida inyectable en CIMA es una solución de 10 mL para 40 mg.",
+        "answer_ok": false
+      },
+      {
+        "id": "c23",
+        "category": "encadenado",
+        "query": "La ampolla de digoxina trae 500 mcg en 2 mL y la dosis pautada es de 0,25 mg. Pasa primero la dosis a mcg y luego dime cuántos mL cargo.",
+        "needs_tool": true,
+        "expected_tool": "convert_units",
+        "expected_arguments": {
+          "value": 0.25,
+          "from_unit": "mg",
+          "to_unit": "mcg"
+        },
+        "expected_answer": 1,
+        "expected_sequence": [
+          "convert_units",
+          "dose_calculator"
+        ],
+        "notes": "Cadena conversión y cálculo (250 mcg, después 250 / 500 * 2 = 1 mL). La petición pide la conversión primero para que la primera llamada no sea ambigua.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La ampolla de digoxina trae 500 mcg en 2 mL. La dosis pautada es de 0,25 mg. Pasa primero la dosis a mcg: 0,25 mg = 250 mcg. Luego, el volumen a cargo es 2 mL.",
+        "answer_ok": false
+      },
+      {
+        "id": "c24",
+        "category": "encadenado",
+        "query": "Calcula la dosis de ibuprofeno para un niño de 25 kg a 10 mg/kg y hazme la hoja de preparación con la suspensión de 20 mg/mL.",
+        "needs_tool": true,
+        "expected_tool": "dose_calculator",
+        "expected_arguments": {
+          "expression": "10 * 25"
+        },
+        "expected_answer": 12.5,
+        "expected_sequence": [
+          "dose_calculator",
+          "dose_calculator",
+          "create_preparation_sheet"
+        ],
+        "notes": "Cadena: dosis (250 mg), después los mL (12,5 mL) y por último la hoja. expected_answer es el volumen final.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La dosis de ibuprofeno es:  \n**25 kg × 10 mg/kg = 250 mg**.\n\nLa hoja de preparación con la suspensión de 20 mg/mL es:  \n**250 mg en 10 mL**.",
+        "answer_ok": false
+      },
+      {
+        "id": "c25",
+        "category": "sin_herramienta",
+        "query": "¿Qué significa que un fármaco se administre por vía intravenosa?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "Un fármaco se administre por vía intravenosa cuando se administra por un vía intravénular, como una vena, para administrar el fármaco en una dosis rápida y eficaz.",
+        "answer_ok": null
+      },
+      {
+        "id": "c26",
+        "category": "sin_herramienta",
+        "query": "¿Cuál es la diferencia entre dosis y concentración?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La diferencia entre dosis y concentración es que la **dosis** es la cantidad de medicamento administrado, mientras que la **concentración** indica la proporción de la sustancia en la solución.",
+        "answer_ok": null
+      },
+      {
+        "id": "c27",
+        "category": "sin_herramienta",
+        "query": "¿Para qué sirve el paracetamol?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Tentador: menciona un fármaco pero no pide presentaciones ni datos de CIMA.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "El paracetamol sirve para reducir la fiebre y aliviar el dolor.",
+        "answer_ok": null
+      },
+      {
+        "id": "c28",
+        "category": "sin_herramienta",
+        "query": "¿Qué significa la abreviatura mcg en una prescripción?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría sobre una abreviatura; ninguna herramienta responde a esto.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "La abreviatura **MCG** (milligramos por cada gota) se usa en la prescripción para indicar la cantidad de medicamento a administrar en miligramos por gota.",
+        "answer_ok": null
+      },
+      {
+        "id": "c29",
+        "category": "sin_herramienta",
+        "query": "Hola, ¿me puedes ayudar con un problema de enfermería?",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Conversación.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "Hola, ¿puedes decirme qué problema tienes en la enfermería?",
+        "answer_ok": null
+      },
+      {
+        "id": "c30",
+        "category": "sin_herramienta",
+        "query": "Explícame con tus palabras qué es una perfusión continua.",
+        "needs_tool": false,
+        "expected_tool": null,
+        "expected_arguments": {},
+        "expected_answer": null,
+        "notes": "Pregunta de teoría.",
+        "condition": "no_tools",
+        "tool_calls": [],
+        "answer": "Una perfusión continua es una administración de fluidos o medicamentos a una persona mediante un sistema de infusión, que se continúa a una temperatura constante.",
+        "answer_ok": null
+      }
+    ]
+  }
+}
