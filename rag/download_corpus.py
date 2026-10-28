@@ -272,7 +272,7 @@ def escribir_markdown(med, practiv, secciones):
 
         texto = html_to_text(s.get("contenido", ""))
         nivel = "##" if num.count(".") <= 1 else "###"
-        partes += [f"{nivel} {med['nombre']} — {num} {s.get('titulo', '').strip()}", "",
+        partes += [f"{nivel} {num} {s.get('titulo', '').strip()}", "",
                    texto or "(sin contenido)", ""]
 
         guardadas.append(num)
