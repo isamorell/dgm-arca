@@ -1364,3 +1364,27 @@ Este documento se encuentra fuera de la carpeta de corpus/ ya que los documentos
 **Qué concluimos.** Una vez tenemos el corpus, podemos generar el conjunto dorado que utilizaremos como ground truth para medir y comparar el rendimiento de las diferentes estrategias de chunking; además de poder calcular el Recall@k y MRR para los tres retrievers.
 
 ---
+
+### 2026-10-28 · Fase 3 · Construcción del conjunto dorado (gold) para evaluar el RAG
+
+**Qué queríamos saber.** Queremos tener de un conjunto dorado de 50 preguntas, cada una con la evidencia (el fragmento de texto del corpus que la responde), para comparar de forma objetiva los distintos retrievers y las distintas estrategias de chunking. Además, queremos que la mezcla de tipos de pregunta permita ver si el sistema falla en alguna categoría concreta.
+
+**Qué hicimos.** El gold se escribió a mano a partir de las fichas técnicas del corpus: para cada pregunta se localizó la evidencia en el texto original y se anotó en `evidence` junto con una nota sobre las secciones implicadas. Este conjunto de datos se puede encontrar en `rag/gold/gold.jsonl`. Las preguntas se reparten así:
+
+| Categoría | Nº | Descripción |
+|---|---|---|
+| Un medicamento, una sección | 15 | La respuesta está en una única sección continua. Se variaron medicamentos y secciones para no sesgar la evaluación. |
+| Un medicamento, varias secciones | 8 | La respuesta requiere combinar secciones no necesariamente consecutivas. |
+| Varios medicamentos | 8 | La respuesta combina información de una o varias secciones de fichas distintas. |
+| Inversas (de síntoma a fármaco) | 8 | Se describe un síntoma o característica y la respuesta es el medicamento y la sección donde se recoge el síntoma o característica descritos. |
+| Lenguaje coloquial | 5 | Redactadas sin terminología técnica, como las formularía un estudiante de Enfermería. |
+| Premisa dudosa | 3 | La pregunta contiene una suposición incorrecta o no respaldada por el corpus. Se espera que el sistema devuelva el texto donde se meustra que la suposición es incorrecta.|
+| Cálculo | 3 | Requieren recuperar datos de la ficha para utilizarse posteriormente en una operación. |
+
+Tras escribir y responder las preguntas, se ajustó la evidencia al tamaño de chunk previsto (`chunk_size=800`). Cuando una evidencia superaba ese tamaño, se dividió en dos o más fragmentos, que siguen asociados a la misma pregunta. Esto afectó a las preguntas 10, 16, 17, 19, 21, 25, 26 y 27 (numeración desde 1).
+
+**Qué pasó.** Se obtuvo un gold de 50 preguntas con evidencia verificada contra el texto original, en `rag/gold/gold.jsonl`. 8 de las 50 (16 %) tuvieron que partirse en varios fragmentos de evidencia, lo que ya indica que las respuestas largas no caben en un chunk de 800 caracteres. 
+
+**Qué concluimos.** Con este conjunto ya podemos medir la recuperación (recall@k y MRR) por categoría y no solo en global. Hay dos precauciones. Con 50 preguntas, las categorías pequeñas (3 de premisa dudosa, 3 de cálculo) dan resultados anecdóticos, así que se interpretarán como casos y no como porcentajes. Siguiente paso: evaluar las dos estrategias de chunking y los tres retrievers.
+
+---
