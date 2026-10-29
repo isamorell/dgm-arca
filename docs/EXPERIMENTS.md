@@ -1388,3 +1388,217 @@ Tras escribir y responder las preguntas, se ajustó la evidencia al tamaño de c
 **Qué concluimos.** Con este conjunto ya podemos medir la recuperación (recall@k y MRR) por categoría y no solo en global. Hay dos precauciones. Con 50 preguntas, las categorías pequeñas (3 de premisa dudosa, 3 de cálculo) dan resultados anecdóticos, así que se interpretarán como casos y no como porcentajes. Siguiente paso: evaluar las dos estrategias de chunking y los tres retrievers.
 
 ---
+
+### 2026-10-29 · Fase 3 · Elección del umbral del chunking semántico
+
+**Qué queríamos saber.** Qué umbral de distancia coseno usar en `semantic_chunks` para poder
+compararlo con el chunking recursivo y fijarlo en `rag/generate.py`.
+
+**Qué hicimos.** Primero miramos la distribución de las distancias entre frases consecutivas de
+todo el corpus y la gráfica de un documento (ceftriaxona), con el barrido que propone el
+docstring de `rag/chunking.py` (0.15 a 0.4, con 0.25 por defecto) y uno más alto:
+
+`uv run python -m rag.chunking --doc ceftriaxona --sweep 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 --threshold 0.75 --out reports/rag/chunking_distances.png`
+
+Después medimos la recuperación con cada umbral sobre el conjunto dorado: para cada umbral se
+trocea el corpus, se construyen los tres retrievers (λ = 0.5 en el híbrido) y se calculan
+Recall@5 y MRR sobre las 50 preguntas. Una pregunta cuya evidencia no cabe entera en ningún
+chunk cuenta como fallo. Embeddings con Qwen3-Embedding-0.6B y `max_chunk_chars=1500`:
+
+`uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --thresholds 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 --out reports/phase3_threshold_sweep.json`
+
+Por último, contamos por qué se cierra cada chunk: por superar el umbral (corte semántico), por
+superar los 1500 caracteres (corte por tamaño) o por empezar una sección nueva (846 secciones).
+
+**Qué pasó.** Las distancias en nuestro corpus son altas: p10 = 0.26, p25 = 0.39, p50 = 0.51,
+p75 = 0.65, p90 = 0.74, p95 = 0.78. Con los umbrales de ejemplo del docstring de `chunking.py` (0.15–0.4) salen entre
+11 000 y 14 000 chunks de unos 130 caracteres de media: prácticamente una frase por chunk.
+
+![Distancia entre frases consecutivas de la ficha de ceftriaxona, con el umbral 0.75](../reports/rag/chunking_distances.png)
+
+La gráfica no muestra picos aislados que separen temas: la distancia oscila entre 0.1 y 0.9
+dentro de todas las secciones y los inicios de sección (líneas grises) no coinciden con los
+picos. Las fichas técnicas cambian de tema de una frase a otra (listas de reacciones adversas,
+tablas de dosis), así que el umbral no se puede elegir a ojo y lo elegimos con el barrido:
+
+| Umbral | Chunks | Media (car.) | Sin resolver | Cortes semánticos | Cortes por tamaño | Dense R@5 / MRR | Hybrid R@5 / MRR |
+|---|---|---|---|---|---|---|---|
+| 0.60 | 5630 | 272 | 12 | 4731 | 53 | 0.433 / 0.428 | 0.447 / 0.458 |
+| 0.70 | 3334 | 433 | 5 | 2258 | 230 | 0.548 / 0.535 | 0.548 / 0.513 |
+| **0.75** | **2406** | **585** | **3** | **1171** | **389** | **0.543 / 0.567** | **0.568 / 0.592** |
+| 0.80 | 1825 | 758 | 2 | 444 | 535 | 0.578 / 0.569 | 0.588 / 0.591 |
+| 0.85 | 1563 | 879 | 1 | 102 | 615 | 0.643 / 0.617 | 0.653 / 0.632 |
+| 0.90 | 1496 | 916 | 1 | 12 | 638 | 0.653 / 0.607 | 0.653 / 0.628 |
+
+"Sin resolver" son las preguntas del gold cuya evidencia no está entera en ningún chunk. Como
+referencia, el chunking recursivo (`chunk_size=800`) da 2626 chunks de 556 caracteres de media:
+800 es el tamaño máximo, y las secciones cortas y los finales de sección dan chunks menores.
+
+**Qué concluimos.** Elegimos **0.75**, sabiendo que no es el umbral con mejores números: 0.85 y
+0.9 tienen unos 0.06–0.09 más de Recall@5 (3–4 preguntas de 50) y algo más de MRR. No los
+elegimos porque en ellos el criterio semántico casi no actúa: a partir de 0.8 los cortes por
+tamaño superan a los semánticos, y en 0.85 y 0.9 quedan 102 y 12 cortes semánticos frente a más
+de 600 por tamaño. Es decir, eso ya no es chunking semántico sino trocear cada sección cada 1500
+caracteres, y la mejora se explica porque los chunks son más grandes: es más fácil que contengan
+la evidencia entera (hay menos preguntas sin resolver) y hay menos chunks entre los que elegir.
+Además, chunks de 900 caracteres meten más texto irrelevante en el prompt de generación. 0.75 es
+el umbral más alto en el que el criterio semántico sigue haciendo la mayor parte de los cortes,
+empata en MRR del híbrido con 0.8 y tiene una longitud media (585) parecida a la del recursivo
+(556), lo que hace justa la comparación entre los dos chunkings. Con 50 preguntas, la diferencia
+entre 0.75 y 0.8 (unas 2 preguntas) no es significativa.
+
+---
+
+### 2026-10-29 · Fase 3 · Chunking recursivo frente a semántico, tres retrievers y barrido de λ
+
+**Qué queríamos saber.** Qué chunking y qué retriever recuperan mejor sobre el conjunto dorado,
+y qué λ usar en el híbrido.
+
+**Qué hicimos.** `rag/evaluate.py` trocea el corpus con las dos estrategias: recursivo
+(`chunk_size=800`, `overlap=100`) y semántico (umbral 0.75), ambos por secciones y con el
+encabezado de la sección delante de cada chunk. Para cada una construye BM25, denso
+(Qwen3-Embedding-0.6B con la instrucción por defecto) e híbrido. Como los ids de los chunks
+cambian con la estrategia, los fragmentos relevantes de cada pregunta se calculan buscando la
+evidencia del gold dentro del texto de los chunks. Con eso calcula Recall@5 y MRR de cada
+retriever y repite el híbrido con λ de 0 a 1 en pasos de 0.1:
+
+`uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --out reports/phase3_eval.json`
+
+**Qué pasó.** Métricas sobre las preguntas resueltas (48 en recursivo, 47 en semántico):
+
+| Chunking | Chunks | Media | Sin resolver | BM25 R@5 / MRR | Dense R@5 / MRR | Hybrid λ=0.5 R@5 / MRR | Mejor λ | Hybrid mejor λ R@5 / MRR |
+|---|---|---|---|---|---|---|---|---|
+| Recursivo | 2626 | 556 | 2 (14, 44) | 0.424 / 0.394 | 0.642 / 0.568 | 0.611 / 0.616 | 0.4 | **0.642 / 0.632** |
+| Semántico 0.75 | 2406 | 585 | 3 (5, 7, 10) | 0.475 / 0.417 | 0.578 / 0.603 | 0.605 / 0.630 | 0.3 | 0.583 / **0.647** |
+
+Barrido de λ (peso de BM25; λ = 0 es el denso solo y λ = 1 es BM25 solo):
+
+| λ | 0.0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Recursivo R@5 | 0.642 | 0.642 | 0.642 | 0.642 | 0.642 | 0.611 | 0.569 | 0.503 | 0.465 | 0.444 | 0.424 |
+| Recursivo MRR | 0.568 | 0.577 | 0.593 | 0.612 | **0.632** | 0.616 | 0.502 | 0.481 | 0.445 | 0.413 | 0.394 |
+| Semántico R@5 | 0.578 | 0.578 | 0.578 | 0.583 | 0.583 | 0.605 | 0.594 | 0.514 | 0.486 | 0.454 | 0.475 |
+| Semántico MRR | 0.603 | 0.616 | 0.627 | **0.647** | 0.637 | 0.630 | 0.539 | 0.497 | 0.447 | 0.425 | 0.417 |
+
+Tres cosas se ven en esta tabla:
+
+- Entre λ = 0 y λ = 0.4 el Recall@5 no cambia (0.642 en recursivo, 0.578–0.583 en semántico),
+  pero el MRR sube de 0.568 a 0.632 y de 0.603 a 0.647. Es decir, añadir un poco de BM25 no mete
+  chunks relevantes nuevos en el top 5, sino que sube de posición los que el denso ya encontraba.
+- A partir de λ = 0.6 las dos métricas caen rápido: el ranking pasa a estar dominado por BM25.
+- BM25 solo (λ = 1) es la peor configuración en los dos chunkings (Recall@5 0.424 y 0.475).
+
+Las preguntas sin resolver no se pueden puntuar porque ningún chunk contiene su evidencia
+entera. En recursivo son la 14 y la 44: sus evidencias (685 y 683 caracteres) caben en el
+tamaño máximo, pero el divisor corta dentro de ellas y quedan repartidas en dos chunks. En
+semántico son la 5, la 7 y la 10: un corte (semántico o por tamaño) cae en mitad de la evidencia.
+
+**Qué concluimos.** El denso gana a BM25 con diferencia. Creemos que se debe a que 13 de las 50
+preguntas del gold son coloquiales o inversas (de síntoma a fármaco) y no comparten palabras con
+la ficha; falta comprobarlo con las métricas por categoría. BM25 sirve como complemento con un
+peso pequeño: nuestra hipótesis es que sube el chunk bueno por coincidencia exacta con el nombre
+del fármaco o con cifras, en fichas de la misma familia que el denso confunde (cefalosporinas,
+carbapenems) aunque no lo hemos verificado pregunta a pregunta. Los dos chunkings quedan prácticamente
+empatados en MRR. Sin embargo, el recursivo tiene mejor recall y una pregunta menos sin resolver, así que
+**`/rag` usa chunking recursivo e híbrido con λ = 0.4**. Elegimos λ por MRR porque el endpoint
+devuelve pocos fragmentos y lo que importa es que el bueno salga primero. Queda pendiente analizar
+las preguntas que fallan (`failures` en `reports/phase3_eval.json`) por categoría del gold, y
+probar otras instrucciones de embedding.
+
+---
+
+### 2026-10-29 · Fase 3 · Generación con citas: primera prueba de `/rag`
+
+**Qué queríamos saber.** Si `POST /rag` funciona de principio a fin: recupera, cita fragmentos
+que existen y dice que no sabe cuando el corpus no tiene la respuesta.
+
+**Qué hicimos.** Completamos el pipeline de `rag/generate.py`, que es lo que hay detrás de
+`POST /rag`. Al arrancar lee el corpus, lo trocea con chunking recursivo, construye los tres
+retrievers (híbrido con λ = 0.4, según el barrido de la entrada anterior) y carga el modelo
+generador. El índice denso se guarda en `rag/index/` para no reembeber el corpus en cada arranque.
+Para cada pregunta recupera los `top_k` mejores fragmentos y los mete en el prompt aumentado con
+su identificador. Después genera la respuesta y extrae las citas, quedándose solo con las que
+existen entre los fragmentos devueltos. Como generador usamos Qwen3-4B base, sin razonamiento y
+con decodificación voraz.
+
+Levantamos la API (`make api`, o `uv run uvicorn api.app:app --port 8001`) y comprobamos con
+`curl localhost:8001/health` que la fase `rag` aparece como `ready`. Hicimos tres peticiones, una con cada retriever:
+
+1. Una pregunta del gold, con el híbrido:
+
+```bash
+curl -s -X POST localhost:8000/rag -H 'Content-Type: application/json' \
+  -d '{"question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?", "top_k": 5, "retriever": "hybrid"}'
+```
+
+2. Una pregunta coloquial, con el denso:
+
+```bash
+curl -s -X POST localhost:8001/rag -H 'Content-Type: application/json' \
+  -d '{"question": "¿Se puede dar meropenem con probenecid?", "top_k": 5, "retriever": "dense"}'
+```
+
+3. Una pregunta que el corpus no puede responder (el omeprazol no está en el corpus), con BM25:
+
+```bash
+curl -s -X POST localhost:8001/rag -H 'Content-Type: application/json' \
+  -d '{"question": "¿Cuál es la dosis de omeprazol intravenoso en una hemorragia digestiva?", "top_k": 5, "retriever": "bm25"}'
+```
+
+Cada respuesta trae `answer`, los fragmentos recuperados (`chunks`, con id, fichero, puntuación y
+texto), las citas válidas (`citations`), el `retriever` y el `model`.
+
+**Qué pasó.**
+
+| Caso | Retriever | Fragmentos recuperados (fichero, puntuación) | Citas |
+|---|---|---|---|
+| 1. Cefotaxima | hybrid | ceftriaxona 4.2 (0.91), **cefotaxima 4.4** (0.84), ceftazidima 4.2 (0.49), cefuroxima 4.2.1 (0.45), cefazolina 4.2 (0.44) | `7f4d67e570-0026` |
+| 2. Meropenem | dense | meropenem 4.5 (0.86), meropenem 4.4 (0.76), amoxicilina 4.5 (0.71), meropenem 4.4 (0.68), meropenem 4.4 (0.68) | `de9b07db3c-0021` |
+| 3. Omeprazol | bm25 | enoxaparina 4.4 (17.9), heparina 4.9 (17.0), furosemida 4.2 (16.9), furosemida 4.2 (16.3), azitromicina 4.2.2 (15.9) | ninguna |
+
+- **Caso 1.** El único fragmento de cefotaxima es el de la sección 4.4 (`7f4d67e570-0026`), no el
+  de la 4.2 que tiene la respuesta (`7f4d67e570-0011`), así que es un fallo de recuperación. La
+  respuesta:
+
+  > La dosis de cefotaxima debe ajustarse según el cálculo del aclaramiento de creatinina
+  > [7f4d67e570-0026]. En pacientes con insuficiencia renal grave, se debe reducir la dosis de
+  > cefotaxima para compensar su excreción más lenta, al igual que con todos los antibióticos.
+  > Además, se debe monitorizar la función renal en estos pacientes, en los pacientes de edad
+  > avanzada y en aquellos con insuficiencia renal previa.
+
+  No da la regla concreta de la ficha (reducir a la mitad la dosis de mantenimiento si el
+  aclaramiento es < 10 ml/min), y la segunda frase ("al igual que con todos los antibióticos")
+  no está en ninguno de los fragmentos recuperados ni lleva cita: es una alucinación. Al probar
+  la misma pregunta llamando a `answer_with_rag` desde un script, con los mismos cinco
+  fragmentos, la redacción salió distinta: aun con decodificación voraz, la generación no es
+  exactamente reproducible en GPU.
+- **Caso 2.** La respuesta es correcta y está citada:
+
+  > Sí, se puede dar meropenem con probenecid, pero se requiere precaución. Probenecid compite
+  > con meropenem en la secreción tubular activa y, por tanto, inhibe su excreción renal, lo que
+  > conlleva a un aumento de la vida media de eliminación y concentración plasmática del
+  > meropenem. Sin embargo, no se recomienda el uso concomitante de probenecid con amoxicilina,
+  > ya que este puede producir un aumento y prolongación de los niveles plasmáticos de
+  > amoxicilina. [de9b07db3c-0021]
+
+  La última frase viene del fragmento de amoxicilina (`03e2eb562d-0027`), que no se cita, y queda
+  cubierta por la cita de meropenem. La comprobación automática solo verifica que el id citado
+  existe entre los fragmentos devueltos, no que respalde cada frase.
+- **Caso 3.** Recupera fragmentos sin relación (BM25 empareja palabras como "dosis",
+  "intravenoso" o "hemorragia") y el modelo dice que no tiene la información, sin citar nada:
+
+  > La información proporcionada no incluye datos sobre la dosis de omeprazol intravenoso en una
+  > hemorragia digestiva. [...] Por lo tanto, no se puede responder a la pregunta con los datos
+  > disponibles.
+
+  Es el comportamiento esperado.
+
+**Qué concluimos.** El endpoint funciona con los tres retrievers, y las citas que devuelve
+existen siempre entre los fragmentos recuperados. Los problemas vistos son de tres tipos: de
+recuperación (el chunk correcto no entra en el top 5, caso 1), de alucinación (una frase sin
+respaldo y sin cita, caso 1) y de atribución (una cita que cubre una frase que no respalda,
+caso 2). Siguiente paso: pasar todo el gold por `/rag` y medir cuántas respuestas citan algún
+chunk relevante, y valorar un juez de fidelidad que compruebe cada frase contra el fragmento
+citado.
+
+---

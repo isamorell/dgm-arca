@@ -1,0 +1,1613 @@
+{
+  "k": 5,
+  "gold": "rag/gold/gold.jsonl",
+  "threshold": 0.75,
+  "chunking": {
+    "recursive": {
+      "stats": {
+        "n_chunks": 2626,
+        "mean_chars": 556.2711348057883,
+        "median_chars": 619.5,
+        "min_chars": 29,
+        "max_chars": 800
+      },
+      "n_unresolved": 2,
+      "retrievers": {
+        "bm25": {
+          "recall@5": 0.42361111111111116,
+          "mrr": 0.39356812169312155,
+          "n_questions": 48,
+          "all": {
+            "recall@5": 0.4066666666666667,
+            "mrr": 0.3778253968253967
+          }
+        },
+        "dense": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.5677910052910052,
+          "n_questions": 48,
+          "all": {
+            "recall@5": 0.6166666666666666,
+            "mrr": 0.545079365079365
+          }
+        },
+        "hybrid": {
+          "recall@5": 0.611111111111111,
+          "mrr": 0.6163194444444444,
+          "n_questions": 48,
+          "all": {
+            "recall@5": 0.5866666666666666,
+            "mrr": 0.5916666666666667
+          }
+        }
+      },
+      "failures": {
+        "bm25": [
+          {
+            "question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?",
+            "relevant": [
+              "7f4d67e570-0011"
+            ],
+            "retrieved": [
+              "35338e7823-0006",
+              "398bb4b1b8-0017",
+              "c4e87629e9-0009",
+              "7f4d67e570-0026",
+              "7f4d67e570-0031"
+            ]
+          },
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0006"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0014",
+              "d31fc0c7c6-0055",
+              "d31fc0c7c6-0014",
+              "e82830b755-0011",
+              "6ff73b3a35-0011"
+            ]
+          },
+          {
+            "question": "¿Cuál es la dosis máxima diaria de dexketoprofeno y durante cuánto tiempo se recomienda su uso?",
+            "relevant": [
+              "d31fc0c7c6-0005"
+            ],
+            "retrieved": [
+              "b49e2d62e8-0005",
+              "61c53c802c-0011",
+              "d31fc0c7c6-0028",
+              "b3c905b83e-0013",
+              "ee0ae7c744-0008"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0053",
+              "f8db428f58-0040",
+              "6351d52285-0063"
+            ],
+            "retrieved": [
+              "f8db428f58-0013",
+              "4562783e1d-0033",
+              "f8db428f58-0017",
+              "f8db428f58-0009",
+              "f8db428f58-0023"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0070"
+            ],
+            "retrieved": [
+              "7f4d67e570-0047",
+              "8a0b991483-0038",
+              "f4186ec002-0070",
+              "9b357fbf8e-0047",
+              "8c60a20425-0033"
+            ]
+          },
+          {
+            "question": "¿Qué tipos y tamaños de envase de enoxaparina se pueden encontrar?",
+            "relevant": [
+              "cc1d1324d0-0091",
+              "cc1d1324d0-0092"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0096",
+              "82d84e405c-0030",
+              "f4186ec002-0072",
+              "6351d52285-0064",
+              "6ff73b3a35-0042"
+            ]
+          },
+          {
+            "question": "¿Se puede diluir la tobramicina intravenosa en glucosa al 5 % o debe utilizarse exclusivamente cloruro de sodio al 0,9 %?",
+            "relevant": [
+              "0f049108c1-0072"
+            ],
+            "retrieved": [
+              "daf29b9941-0028",
+              "8c60a20425-0038",
+              "f51b195350-0053",
+              "8a0b991483-0047",
+              "6ff73b3a35-0003"
+            ]
+          },
+          {
+            "question": "¿Qué dosis iniciales y qué precauciones se recomiendan para el midazolam en ancianos?",
+            "relevant": [
+              "2e4de1175a-0007",
+              "2e4de1175a-0014",
+              "2e4de1175a-0019",
+              "2e4de1175a-0020"
+            ],
+            "retrieved": [
+              "2e4de1175a-0016",
+              "2e4de1175a-0034",
+              "2e4de1175a-0012",
+              "2e4de1175a-0047",
+              "2e4de1175a-0030"
+            ]
+          },
+          {
+            "question": "¿En cuántos mg hay que reconstituir un vial de amoxicilina antes de prepararlo para perfusión, y cuánto tiempo puede pasar como máximo entre la reconstitución y la administración?",
+            "relevant": [
+              "03e2eb562d-0006",
+              "03e2eb562d-0041"
+            ],
+            "retrieved": [
+              "de9b07db3c-0042",
+              "9b357fbf8e-0046",
+              "de92e92f3e-0062",
+              "f8db428f58-0042",
+              "f4186ec002-0010"
+            ]
+          },
+          {
+            "question": "¿Afectan la morfina y el tramadol a la capacidad para conducir y utilizar máquinas?",
+            "relevant": [
+              "2477b4c7fd-0045",
+              "61c53c802c-0042"
+            ],
+            "retrieved": [
+              "f8db428f58-0022",
+              "8a0b991483-0028",
+              "910ed8f16d-0029",
+              "cd3276205b-0039",
+              "03e2eb562d-0031"
+            ]
+          },
+          {
+            "question": "¿Qué reacciones adversas cardiovasculares describen las fichas de amiodarona y de esmolol?",
+            "relevant": [
+              "4b5b761581-0044"
+            ],
+            "retrieved": [
+              "6ff73b3a35-0034",
+              "2e4de1175a-0062",
+              "4b5b761581-0043",
+              "dd4c9e923a-0025",
+              "6ff73b3a35-0035"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0014",
+              "cc623ee4ba-0010"
+            ],
+            "retrieved": [
+              "e82830b755-0011",
+              "ba642d0da7-0037",
+              "cc623ee4ba-0032",
+              "d57fe72b8a-0010",
+              "cc623ee4ba-0035"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0034",
+              "eaf11ccc56-0035",
+              "a77c0b5e80-0094",
+              "a77c0b5e80-0095"
+            ],
+            "retrieved": [
+              "f4186ec002-0070",
+              "de9b07db3c-0039",
+              "8a0b991483-0038",
+              "6351d52285-0062",
+              "c4e87629e9-0061"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones se recomiendan al administrar nitroglicerina y dobutamina a pacientes con alteraciones cardiovasculares?",
+            "relevant": [
+              "0f15e47eed-0027",
+              "35338e7823-0011"
+            ],
+            "retrieved": [
+              "35338e7823-0017",
+              "0f15e47eed-0043",
+              "0f15e47eed-0031",
+              "b49e2d62e8-0020",
+              "35338e7823-0025"
+            ]
+          },
+          {
+            "question": "¿Qué sedante intravenoso tiene como antídoto el flumazenilo en caso de sobredosis grave?",
+            "relevant": [
+              "2e4de1175a-0065"
+            ],
+            "retrieved": [
+              "cd3276205b-0047",
+              "61c53c802c-0053",
+              "398bb4b1b8-0063",
+              "7f4d67e570-0043",
+              "b3c905b83e-0045"
+            ]
+          },
+          {
+            "question": "¿Qué anestésico general intravenoso puede provocar alucinaciones al despertar de la anestesia?",
+            "relevant": [
+              "4a22951867-0021"
+            ],
+            "retrieved": [
+              "7aa5c27c2c-0002",
+              "7098aa5906-0003",
+              "4a22951867-0006",
+              "4a22951867-0008",
+              "4a22951867-0023"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0060"
+            ],
+            "retrieved": [
+              "c4e87629e9-0041",
+              "c4e87629e9-0026",
+              "e84ad7c745-0008",
+              "c4e87629e9-0058",
+              "c4e87629e9-0045"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0051",
+              "ba642d0da7-0046",
+              "228d4cf6f2-0027",
+              "cc623ee4ba-0053",
+              "35338e7823-0032",
+              "82d84e405c-0029",
+              "61c53c802c-0057"
+            ],
+            "retrieved": [
+              "ba642d0da7-0002",
+              "ba642d0da7-0047",
+              "cc1d1324d0-0037",
+              "ba642d0da7-0000",
+              "ba642d0da7-0006"
+            ]
+          },
+          {
+            "question": "Paciente de 80 años con aclaramiento de creatinina de 20 mL/min, ¿tengo que reducir la dosis de levofloxacino?",
+            "relevant": [
+              "f4186ec002-0009"
+            ],
+            "retrieved": [
+              "cd3276205b-0011",
+              "cd3276205b-0013",
+              "cc1d1324d0-0060",
+              "1d57fa5f18-0009",
+              "c4e87629e9-0012"
+            ]
+          },
+          {
+            "question": "¿Puedo poner la amiodarona en suero fisiológico o solo en glucosado?",
+            "relevant": [
+              "4b5b761581-0055"
+            ],
+            "retrieved": [
+              "daf29b9941-0028",
+              "35338e7823-0034",
+              "35338e7823-0008",
+              "de92e92f3e-0055",
+              "4b5b761581-0041"
+            ]
+          },
+          {
+            "question": "¿Se puede administrar ciprofloxacino intravenoso en inyección rápida en bolo, en un minuto?",
+            "relevant": [
+              "ecd33fe743-0018"
+            ],
+            "retrieved": [
+              "6351d52285-0009",
+              "4562783e1d-0027",
+              "cc1d1324d0-0088",
+              "ba642d0da7-0009",
+              "4562783e1d-0013"
+            ]
+          },
+          {
+            "question": "¿Se puede administrar amikacina durante el embarazo sin ningún riesgo para el feto?",
+            "relevant": [
+              "1d57fa5f18-0034"
+            ],
+            "retrieved": [
+              "6ff73b3a35-0031",
+              "d37f178e35-0031",
+              "0f049108c1-0048",
+              "f8db428f58-0020",
+              "ba642d0da7-0034"
+            ]
+          },
+          {
+            "question": "Un vial de imipenem/cilastatina de 500 mg/500 mg se prepara en el volumen de solución de perfusión que indica la ficha. ¿Qué concentración de imipenem, en mg/mL, resulta?",
+            "relevant": [
+              "d37f178e35-0050"
+            ],
+            "retrieved": [
+              "d37f178e35-0001",
+              "d37f178e35-0006",
+              "d37f178e35-0025",
+              "d37f178e35-0000",
+              "d37f178e35-0047"
+            ]
+          },
+          {
+            "question": "Según la concentración de la solución de ciprofloxacino para perfusión, ¿cuántos mL hay que administrar para dar una dosis de 400 mg?",
+            "relevant": [
+              "ecd33fe743-0001"
+            ],
+            "retrieved": [
+              "ecd33fe743-0018",
+              "8c60a20425-0001",
+              "f51b195350-0009",
+              "dd4c9e923a-0009",
+              "0f15e47eed-0017"
+            ]
+          }
+        ],
+        "dense": [
+          {
+            "question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?",
+            "relevant": [
+              "7f4d67e570-0011"
+            ],
+            "retrieved": [
+              "398bb4b1b8-0017",
+              "7f4d67e570-0026",
+              "910ed8f16d-0011",
+              "8a0b991483-0007",
+              "8c60a20425-0006"
+            ]
+          },
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0006"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0009",
+              "228d4cf6f2-0010",
+              "7aa5c27c2c-0016",
+              "228d4cf6f2-0012",
+              "cc1d1324d0-0038"
+            ]
+          },
+          {
+            "question": "¿Cuál es la dosis máxima diaria de dexketoprofeno y durante cuánto tiempo se recomienda su uso?",
+            "relevant": [
+              "d31fc0c7c6-0005"
+            ],
+            "retrieved": [
+              "d31fc0c7c6-0053",
+              "d31fc0c7c6-0031",
+              "d31fc0c7c6-0001",
+              "d31fc0c7c6-0051",
+              "d31fc0c7c6-0026"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0053",
+              "f8db428f58-0040",
+              "6351d52285-0063"
+            ],
+            "retrieved": [
+              "f8db428f58-0013",
+              "f8db428f58-0015",
+              "f8db428f58-0012",
+              "f8db428f58-0009",
+              "f8db428f58-0014"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0070"
+            ],
+            "retrieved": [
+              "d57fe72b8a-0020",
+              "d57fe72b8a-0039",
+              "d57fe72b8a-0013",
+              "d57fe72b8a-0065",
+              "d57fe72b8a-0018"
+            ]
+          },
+          {
+            "question": "¿Qué tipos y tamaños de envase de enoxaparina se pueden encontrar?",
+            "relevant": [
+              "cc1d1324d0-0091",
+              "cc1d1324d0-0092"
+            ],
+            "retrieved": [
+              "cc1d1324d0-0001",
+              "cc1d1324d0-0028",
+              "cc1d1324d0-0074",
+              "cc1d1324d0-0027",
+              "cc1d1324d0-0025"
+            ]
+          },
+          {
+            "question": "¿En cuántos mg hay que reconstituir un vial de amoxicilina antes de prepararlo para perfusión, y cuánto tiempo puede pasar como máximo entre la reconstitución y la administración?",
+            "relevant": [
+              "03e2eb562d-0006",
+              "03e2eb562d-0041"
+            ],
+            "retrieved": [
+              "03e2eb562d-0042",
+              "03e2eb562d-0048",
+              "03e2eb562d-0044",
+              "03e2eb562d-0047",
+              "f51b195350-0051"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0014",
+              "cc623ee4ba-0010"
+            ],
+            "retrieved": [
+              "4a22951867-0041",
+              "cc623ee4ba-0026",
+              "4a22951867-0027",
+              "4a22951867-0030",
+              "4a22951867-0018"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0034",
+              "eaf11ccc56-0035",
+              "a77c0b5e80-0094",
+              "a77c0b5e80-0095"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0005",
+              "a77c0b5e80-0004",
+              "eaf11ccc56-0013",
+              "eaf11ccc56-0039",
+              "eaf11ccc56-0038"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones se recomiendan al administrar nitroglicerina y dobutamina a pacientes con alteraciones cardiovasculares?",
+            "relevant": [
+              "0f15e47eed-0027",
+              "35338e7823-0011"
+            ],
+            "retrieved": [
+              "35338e7823-0018",
+              "0f15e47eed-0023",
+              "35338e7823-0012",
+              "0f15e47eed-0031",
+              "35338e7823-0017"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0060"
+            ],
+            "retrieved": [
+              "c4e87629e9-0004",
+              "c4e87629e9-0030",
+              "c4e87629e9-0022",
+              "c4e87629e9-0018",
+              "c4e87629e9-0065"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0051",
+              "ba642d0da7-0046",
+              "228d4cf6f2-0027",
+              "cc623ee4ba-0053",
+              "35338e7823-0032",
+              "82d84e405c-0029",
+              "61c53c802c-0057"
+            ],
+            "retrieved": [
+              "ba642d0da7-0002",
+              "ba642d0da7-0006",
+              "ba642d0da7-0000",
+              "ba642d0da7-0018",
+              "ba642d0da7-0048"
+            ]
+          },
+          {
+            "question": "¿Puedo poner la amiodarona en suero fisiológico o solo en glucosado?",
+            "relevant": [
+              "4b5b761581-0055"
+            ],
+            "retrieved": [
+              "4b5b761581-0023",
+              "4b5b761581-0022",
+              "4b5b761581-0024",
+              "4b5b761581-0009",
+              "4b5b761581-0019"
+            ]
+          }
+        ],
+        "hybrid": [
+          {
+            "question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?",
+            "relevant": [
+              "7f4d67e570-0011"
+            ],
+            "retrieved": [
+              "398bb4b1b8-0017",
+              "7f4d67e570-0026",
+              "35338e7823-0006",
+              "910ed8f16d-0011",
+              "8a0b991483-0007"
+            ]
+          },
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0006"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0014",
+              "228d4cf6f2-0009",
+              "d31fc0c7c6-0055",
+              "d31fc0c7c6-0014",
+              "e82830b755-0011"
+            ]
+          },
+          {
+            "question": "¿Cuál es la dosis máxima diaria de dexketoprofeno y durante cuánto tiempo se recomienda su uso?",
+            "relevant": [
+              "d31fc0c7c6-0005"
+            ],
+            "retrieved": [
+              "b49e2d62e8-0005",
+              "d31fc0c7c6-0053",
+              "d31fc0c7c6-0028",
+              "61c53c802c-0011",
+              "d31fc0c7c6-0031"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0053",
+              "f8db428f58-0040",
+              "6351d52285-0063"
+            ],
+            "retrieved": [
+              "f8db428f58-0013",
+              "f8db428f58-0015",
+              "f8db428f58-0009",
+              "f8db428f58-0017",
+              "f8db428f58-0023"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0070"
+            ],
+            "retrieved": [
+              "d57fe72b8a-0020",
+              "7f4d67e570-0047",
+              "8a0b991483-0038",
+              "d57fe72b8a-0039",
+              "d57fe72b8a-0013"
+            ]
+          },
+          {
+            "question": "¿Qué tipos y tamaños de envase de enoxaparina se pueden encontrar?",
+            "relevant": [
+              "cc1d1324d0-0091",
+              "cc1d1324d0-0092"
+            ],
+            "retrieved": [
+              "cc1d1324d0-0001",
+              "a77c0b5e80-0096",
+              "82d84e405c-0030",
+              "cc1d1324d0-0028",
+              "cc1d1324d0-0074"
+            ]
+          },
+          {
+            "question": "¿En cuántos mg hay que reconstituir un vial de amoxicilina antes de prepararlo para perfusión, y cuánto tiempo puede pasar como máximo entre la reconstitución y la administración?",
+            "relevant": [
+              "03e2eb562d-0006",
+              "03e2eb562d-0041"
+            ],
+            "retrieved": [
+              "03e2eb562d-0042",
+              "9b357fbf8e-0046",
+              "de9b07db3c-0042",
+              "de92e92f3e-0062",
+              "03e2eb562d-0048"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0014",
+              "cc623ee4ba-0010"
+            ],
+            "retrieved": [
+              "4a22951867-0041",
+              "4a22951867-0027",
+              "cc623ee4ba-0026",
+              "e82830b755-0011",
+              "ba642d0da7-0037"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0034",
+              "eaf11ccc56-0035",
+              "a77c0b5e80-0094",
+              "a77c0b5e80-0095"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0005",
+              "f4186ec002-0070",
+              "de9b07db3c-0039",
+              "8a0b991483-0038",
+              "6351d52285-0062"
+            ]
+          },
+          {
+            "question": "¿Qué diferencias existen entre las indicaciones terapéuticas del cloruro de potasio y el sulfato de magnesio intravenosos?",
+            "relevant": [
+              "ee0ae7c744-0003",
+              "daf29b9941-0002"
+            ],
+            "retrieved": [
+              "ee0ae7c744-0000",
+              "ee0ae7c744-0014",
+              "ee0ae7c744-0012",
+              "daf29b9941-0003",
+              "daf29b9941-0014"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0060"
+            ],
+            "retrieved": [
+              "c4e87629e9-0026",
+              "c4e87629e9-0004",
+              "c4e87629e9-0041",
+              "c4e87629e9-0030",
+              "c4e87629e9-0022"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0051",
+              "ba642d0da7-0046",
+              "228d4cf6f2-0027",
+              "cc623ee4ba-0053",
+              "35338e7823-0032",
+              "82d84e405c-0029",
+              "61c53c802c-0057"
+            ],
+            "retrieved": [
+              "ba642d0da7-0002",
+              "ba642d0da7-0047",
+              "ba642d0da7-0000",
+              "ba642d0da7-0006",
+              "ba642d0da7-0028"
+            ]
+          },
+          {
+            "question": "¿Puedo poner la amiodarona en suero fisiológico o solo en glucosado?",
+            "relevant": [
+              "4b5b761581-0055"
+            ],
+            "retrieved": [
+              "4b5b761581-0023",
+              "4b5b761581-0022",
+              "daf29b9941-0028",
+              "4b5b761581-0024",
+              "35338e7823-0034"
+            ]
+          },
+          {
+            "question": "¿Se puede administrar amikacina durante el embarazo sin ningún riesgo para el feto?",
+            "relevant": [
+              "1d57fa5f18-0034"
+            ],
+            "retrieved": [
+              "1d57fa5f18-0035",
+              "6ff73b3a35-0031",
+              "d37f178e35-0031",
+              "0f049108c1-0048",
+              "f8db428f58-0020"
+            ]
+          },
+          {
+            "question": "Un vial de imipenem/cilastatina de 500 mg/500 mg se prepara en el volumen de solución de perfusión que indica la ficha. ¿Qué concentración de imipenem, en mg/mL, resulta?",
+            "relevant": [
+              "d37f178e35-0050"
+            ],
+            "retrieved": [
+              "d37f178e35-0001",
+              "d37f178e35-0000",
+              "d37f178e35-0047",
+              "d37f178e35-0013",
+              "d37f178e35-0006"
+            ]
+          }
+        ]
+      },
+      "lambda_sweep": {
+        "0.0": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.5677910052910052,
+          "n_questions": 48
+        },
+        "0.1": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.577281746031746,
+          "n_questions": 48
+        },
+        "0.2": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.5934027777777778,
+          "n_questions": 48
+        },
+        "0.3": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.6121527777777779,
+          "n_questions": 48
+        },
+        "0.4": {
+          "recall@5": 0.642361111111111,
+          "mrr": 0.6319444444444444,
+          "n_questions": 48
+        },
+        "0.5": {
+          "recall@5": 0.611111111111111,
+          "mrr": 0.6163194444444444,
+          "n_questions": 48
+        },
+        "0.6": {
+          "recall@5": 0.5694444444444444,
+          "mrr": 0.5016203703703703,
+          "n_questions": 48
+        },
+        "0.7": {
+          "recall@5": 0.5034722222222222,
+          "mrr": 0.4805472883597883,
+          "n_questions": 48
+        },
+        "0.8": {
+          "recall@5": 0.46527777777777785,
+          "mrr": 0.4449818121693121,
+          "n_questions": 48
+        },
+        "0.9": {
+          "recall@5": 0.4444444444444445,
+          "mrr": 0.412838955026455,
+          "n_questions": 48
+        },
+        "1.0": {
+          "recall@5": 0.42361111111111116,
+          "mrr": 0.39356812169312155,
+          "n_questions": 48
+        }
+      }
+    },
+    "semantic": {
+      "stats": {
+        "n_chunks": 2406,
+        "mean_chars": 585.001246882793,
+        "median_chars": 389.5,
+        "min_chars": 17,
+        "max_chars": 1500
+      },
+      "n_unresolved": 3,
+      "retrievers": {
+        "bm25": {
+          "recall@5": 0.4751773049645391,
+          "mrr": 0.416869300911854,
+          "n_questions": 47,
+          "all": {
+            "recall@5": 0.4466666666666667,
+            "mrr": 0.39185714285714274
+          }
+        },
+        "dense": {
+          "recall@5": 0.5780141843971631,
+          "mrr": 0.6031323877068557,
+          "n_questions": 47,
+          "all": {
+            "recall@5": 0.5433333333333333,
+            "mrr": 0.5669444444444444
+          }
+        },
+        "hybrid": {
+          "recall@5": 0.6046099290780141,
+          "mrr": 0.6296690307328605,
+          "n_questions": 47,
+          "all": {
+            "recall@5": 0.5683333333333332,
+            "mrr": 0.5918888888888888
+          }
+        }
+      },
+      "failures": {
+        "bm25": [
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0005"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0011",
+              "e82830b755-0025",
+              "228d4cf6f2-0017",
+              "d31fc0c7c6-0044",
+              "d31fc0c7c6-0018"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0054",
+              "f8db428f58-0037",
+              "6351d52285-0047"
+            ],
+            "retrieved": [
+              "f8db428f58-0016",
+              "f8db428f58-0015",
+              "f8db428f58-0013",
+              "f8db428f58-0017",
+              "f8db428f58-0014"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0050"
+            ],
+            "retrieved": [
+              "7f4d67e570-0044",
+              "8a0b991483-0039",
+              "de92e92f3e-0051",
+              "f4186ec002-0055",
+              "6351d52285-0046"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las dosis de daptomicina correspondientes al IPPBc sin BSA y al IPPBc asociada a BSA en pacientes de entre 2 y 6 años?",
+            "relevant": [
+              "de92e92f3e-0014"
+            ],
+            "retrieved": [
+              "de92e92f3e-0011",
+              "de92e92f3e-0008",
+              "de92e92f3e-0010",
+              "de92e92f3e-0012",
+              "de92e92f3e-0015"
+            ]
+          },
+          {
+            "question": "¿Se puede diluir la tobramicina intravenosa en glucosa al 5 % o debe utilizarse exclusivamente cloruro de sodio al 0,9 %?",
+            "relevant": [
+              "0f049108c1-0067"
+            ],
+            "retrieved": [
+              "daf29b9941-0034",
+              "f51b195350-0049",
+              "8a0b991483-0048",
+              "8c60a20425-0034",
+              "6ff73b3a35-0009"
+            ]
+          },
+          {
+            "question": "¿Qué dosis iniciales y qué precauciones se recomiendan para el midazolam en ancianos?",
+            "relevant": [
+              "2e4de1175a-0015",
+              "2e4de1175a-0026",
+              "2e4de1175a-0034",
+              "2e4de1175a-0035"
+            ],
+            "retrieved": [
+              "2e4de1175a-0028",
+              "2e4de1175a-0024",
+              "2e4de1175a-0052",
+              "2e4de1175a-0051",
+              "2e4de1175a-0045"
+            ]
+          },
+          {
+            "question": "¿En cuántos mg hay que reconstituir un vial de amoxicilina antes de prepararlo para perfusión, y cuánto tiempo puede pasar como máximo entre la reconstitución y la administración?",
+            "relevant": [
+              "03e2eb562d-0011",
+              "03e2eb562d-0040"
+            ],
+            "retrieved": [
+              "de9b07db3c-0046",
+              "9b357fbf8e-0043",
+              "398bb4b1b8-0024",
+              "03e2eb562d-0046",
+              "9b357fbf8e-0040"
+            ]
+          },
+          {
+            "question": "¿Afectan la morfina y el tramadol a la capacidad para conducir y utilizar máquinas?",
+            "relevant": [
+              "2477b4c7fd-0044",
+              "61c53c802c-0035"
+            ],
+            "retrieved": [
+              "f8db428f58-0023",
+              "cd3276205b-0026",
+              "8a0b991483-0030",
+              "910ed8f16d-0032",
+              "03e2eb562d-0032"
+            ]
+          },
+          {
+            "question": "¿Qué reacciones adversas cardiovasculares describen las fichas de amiodarona y de esmolol?",
+            "relevant": [
+              "6351d52285-0038"
+            ],
+            "retrieved": [
+              "6ff73b3a35-0035",
+              "dd4c9e923a-0025",
+              "2e4de1175a-0067",
+              "4b5b761581-0038",
+              "6ff73b3a35-0037"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0019",
+              "cc623ee4ba-0012"
+            ],
+            "retrieved": [
+              "cc623ee4ba-0026",
+              "61c53c802c-0036",
+              "e82830b755-0025",
+              "d57fe72b8a-0012",
+              "cc623ee4ba-0027"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0026",
+              "eaf11ccc56-0027"
+            ],
+            "retrieved": [
+              "f4186ec002-0055",
+              "f51b195350-0042",
+              "8a0b991483-0039",
+              "de9b07db3c-0042",
+              "6351d52285-0046"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones se recomiendan al administrar nitroglicerina y dobutamina a pacientes con alteraciones cardiovasculares?",
+            "relevant": [
+              "0f15e47eed-0021",
+              "35338e7823-0015"
+            ],
+            "retrieved": [
+              "0f15e47eed-0023",
+              "0f15e47eed-0022",
+              "0f15e47eed-0029",
+              "b49e2d62e8-0018",
+              "35338e7823-0018"
+            ]
+          },
+          {
+            "question": "¿Qué sedante intravenoso tiene como antídoto el flumazenilo en caso de sobredosis grave?",
+            "relevant": [
+              "2e4de1175a-0068"
+            ],
+            "retrieved": [
+              "cd3276205b-0031",
+              "398bb4b1b8-0057",
+              "7f4d67e570-0038",
+              "9b357fbf8e-0038",
+              "b3c905b83e-0052"
+            ]
+          },
+          {
+            "question": "¿Qué anestésico general intravenoso puede provocar alucinaciones al despertar de la anestesia?",
+            "relevant": [
+              "4a22951867-0024"
+            ],
+            "retrieved": [
+              "7aa5c27c2c-0004",
+              "7098aa5906-0007",
+              "4a22951867-0009",
+              "4a22951867-0010",
+              "4a22951867-0011"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0057"
+            ],
+            "retrieved": [
+              "c4e87629e9-0042",
+              "f4186ec002-0016",
+              "c4e87629e9-0055",
+              "e84ad7c745-0013",
+              "c4e87629e9-0029"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0035",
+              "ba642d0da7-0043",
+              "228d4cf6f2-0023",
+              "cc623ee4ba-0038",
+              "35338e7823-0030",
+              "82d84e405c-0023",
+              "61c53c802c-0044"
+            ],
+            "retrieved": [
+              "ba642d0da7-0000",
+              "ba642d0da7-0005",
+              "ba642d0da7-0045",
+              "ba642d0da7-0047",
+              "ba642d0da7-0002"
+            ]
+          },
+          {
+            "question": "Paciente de 80 años con aclaramiento de creatinina de 20 mL/min, ¿tengo que reducir la dosis de levofloxacino?",
+            "relevant": [
+              "f4186ec002-0013"
+            ],
+            "retrieved": [
+              "cd3276205b-0010",
+              "cd3276205b-0009",
+              "9b357fbf8e-0015",
+              "cc1d1324d0-0014",
+              "c4e87629e9-0016"
+            ]
+          },
+          {
+            "question": "Mi paciente se ha pasado de dosis de morfina, ¿qué hago?",
+            "relevant": [
+              "2477b4c7fd-0052"
+            ],
+            "retrieved": [
+              "2477b4c7fd-0014",
+              "2477b4c7fd-0016",
+              "2477b4c7fd-0033",
+              "2477b4c7fd-0021",
+              "6351d52285-0030"
+            ]
+          },
+          {
+            "question": "¿Se puede administrar ciprofloxacino intravenoso en inyección rápida en bolo, en un minuto?",
+            "relevant": [
+              "ecd33fe743-0037"
+            ],
+            "retrieved": [
+              "eaf11ccc56-0031",
+              "ba642d0da7-0014",
+              "b3c905b83e-0015",
+              "4562783e1d-0012",
+              "cc1d1324d0-0059"
+            ]
+          },
+          {
+            "question": "Un vial de imipenem/cilastatina de 500 mg/500 mg se prepara en el volumen de solución de perfusión que indica la ficha. ¿Qué concentración de imipenem, en mg/mL, resulta?",
+            "relevant": [
+              "d37f178e35-0065"
+            ],
+            "retrieved": [
+              "d37f178e35-0005",
+              "d37f178e35-0021",
+              "d37f178e35-0000",
+              "d37f178e35-0002",
+              "d37f178e35-0023"
+            ]
+          },
+          {
+            "question": "Según la concentración de la solución de ciprofloxacino para perfusión, ¿cuántos mL hay que administrar para dar una dosis de 400 mg?",
+            "relevant": [
+              "ecd33fe743-0003"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0018",
+              "ecd33fe743-0037",
+              "0f15e47eed-0015",
+              "f51b195350-0048",
+              "dd4c9e923a-0014"
+            ]
+          }
+        ],
+        "dense": [
+          {
+            "question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?",
+            "relevant": [
+              "7f4d67e570-0016"
+            ],
+            "retrieved": [
+              "8a0b991483-0013",
+              "910ed8f16d-0018",
+              "8c60a20425-0008",
+              "7f4d67e570-0011",
+              "dd4c9e923a-0013"
+            ]
+          },
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0005"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0007",
+              "228d4cf6f2-0008",
+              "7aa5c27c2c-0013",
+              "228d4cf6f2-0004",
+              "cc623ee4ba-0014"
+            ]
+          },
+          {
+            "question": "¿Cuál es la dosis máxima diaria de dexketoprofeno y durante cuánto tiempo se recomienda su uso?",
+            "relevant": [
+              "d31fc0c7c6-0012"
+            ],
+            "retrieved": [
+              "d31fc0c7c6-0033",
+              "d31fc0c7c6-0023",
+              "d31fc0c7c6-0041",
+              "d31fc0c7c6-0004",
+              "d31fc0c7c6-0042"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0054",
+              "f8db428f58-0037",
+              "6351d52285-0047"
+            ],
+            "retrieved": [
+              "f8db428f58-0015",
+              "f8db428f58-0016",
+              "f8db428f58-0013",
+              "f8db428f58-0017",
+              "f8db428f58-0025"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0050"
+            ],
+            "retrieved": [
+              "d57fe72b8a-0026",
+              "d57fe72b8a-0016",
+              "d57fe72b8a-0015",
+              "d57fe72b8a-0017",
+              "d57fe72b8a-0013"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las dosis de daptomicina correspondientes al IPPBc sin BSA y al IPPBc asociada a BSA en pacientes de entre 2 y 6 años?",
+            "relevant": [
+              "de92e92f3e-0014"
+            ],
+            "retrieved": [
+              "de92e92f3e-0010",
+              "de92e92f3e-0008",
+              "de92e92f3e-0054",
+              "de92e92f3e-0028",
+              "de92e92f3e-0003"
+            ]
+          },
+          {
+            "question": "¿Qué reacciones adversas cardiovasculares describen las fichas de amiodarona y de esmolol?",
+            "relevant": [
+              "6351d52285-0038"
+            ],
+            "retrieved": [
+              "4b5b761581-0038",
+              "4b5b761581-0040",
+              "4b5b761581-0016",
+              "4b5b761581-0022",
+              "4b5b761581-0017"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0019",
+              "cc623ee4ba-0012"
+            ],
+            "retrieved": [
+              "4a22951867-0038",
+              "4a22951867-0029",
+              "4a22951867-0022",
+              "cc623ee4ba-0022",
+              "4a22951867-0031"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0026",
+              "eaf11ccc56-0027"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0009",
+              "eaf11ccc56-0012",
+              "eaf11ccc56-0005",
+              "eaf11ccc56-0031",
+              "a77c0b5e80-0016"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0057"
+            ],
+            "retrieved": [
+              "c4e87629e9-0022",
+              "c4e87629e9-0000",
+              "c4e87629e9-0008",
+              "c4e87629e9-0003",
+              "c4e87629e9-0025"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0035",
+              "ba642d0da7-0043",
+              "228d4cf6f2-0023",
+              "cc623ee4ba-0038",
+              "35338e7823-0030",
+              "82d84e405c-0023",
+              "61c53c802c-0044"
+            ],
+            "retrieved": [
+              "ba642d0da7-0000",
+              "ba642d0da7-0005",
+              "ba642d0da7-0047",
+              "ba642d0da7-0023",
+              "ba642d0da7-0002"
+            ]
+          },
+          {
+            "question": "Paciente de 80 años con aclaramiento de creatinina de 20 mL/min, ¿tengo que reducir la dosis de levofloxacino?",
+            "relevant": [
+              "f4186ec002-0013"
+            ],
+            "retrieved": [
+              "f4186ec002-0011",
+              "f4186ec002-0012",
+              "f4186ec002-0024",
+              "f4186ec002-0026",
+              "f4186ec002-0025"
+            ]
+          },
+          {
+            "question": "¿Puedo poner la amiodarona en suero fisiológico o solo en glucosado?",
+            "relevant": [
+              "4b5b761581-0056"
+            ],
+            "retrieved": [
+              "4b5b761581-0011",
+              "4b5b761581-0023",
+              "4b5b761581-0017",
+              "4b5b761581-0015",
+              "4b5b761581-0013"
+            ]
+          },
+          {
+            "question": "Mi paciente se ha pasado de dosis de morfina, ¿qué hago?",
+            "relevant": [
+              "2477b4c7fd-0052"
+            ],
+            "retrieved": [
+              "2477b4c7fd-0016",
+              "2477b4c7fd-0034",
+              "2477b4c7fd-0031",
+              "2477b4c7fd-0027",
+              "2477b4c7fd-0030"
+            ]
+          },
+          {
+            "question": "Un vial de imipenem/cilastatina de 500 mg/500 mg se prepara en el volumen de solución de perfusión que indica la ficha. ¿Qué concentración de imipenem, en mg/mL, resulta?",
+            "relevant": [
+              "d37f178e35-0065"
+            ],
+            "retrieved": [
+              "d37f178e35-0003",
+              "d37f178e35-0005",
+              "d37f178e35-0023",
+              "d37f178e35-0000",
+              "d37f178e35-0063"
+            ]
+          }
+        ],
+        "hybrid": [
+          {
+            "question": "¿En qué situaciones está contraindicado el ibuprofeno intravenoso?",
+            "relevant": [
+              "228d4cf6f2-0005"
+            ],
+            "retrieved": [
+              "228d4cf6f2-0011",
+              "228d4cf6f2-0007",
+              "228d4cf6f2-0017",
+              "e82830b755-0025",
+              "228d4cf6f2-0008"
+            ]
+          },
+          {
+            "question": "¿Qué precauciones especiales de conservación se deben tener con el ertapenem?",
+            "relevant": [
+              "4b5b761581-0054",
+              "f8db428f58-0037",
+              "6351d52285-0047"
+            ],
+            "retrieved": [
+              "f8db428f58-0016",
+              "f8db428f58-0015",
+              "f8db428f58-0013",
+              "f8db428f58-0017",
+              "f8db428f58-0014"
+            ]
+          },
+          {
+            "question": "¿Cuál es el periodo de validez del linezolid y en qué condiciones?",
+            "relevant": [
+              "d57fe72b8a-0050"
+            ],
+            "retrieved": [
+              "d57fe72b8a-0026",
+              "7f4d67e570-0044",
+              "d57fe72b8a-0016",
+              "8a0b991483-0039",
+              "d57fe72b8a-0015"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las dosis de daptomicina correspondientes al IPPBc sin BSA y al IPPBc asociada a BSA en pacientes de entre 2 y 6 años?",
+            "relevant": [
+              "de92e92f3e-0014"
+            ],
+            "retrieved": [
+              "de92e92f3e-0010",
+              "de92e92f3e-0008",
+              "de92e92f3e-0011",
+              "de92e92f3e-0054",
+              "de92e92f3e-0012"
+            ]
+          },
+          {
+            "question": "¿Qué reacciones adversas cardiovasculares describen las fichas de amiodarona y de esmolol?",
+            "relevant": [
+              "6351d52285-0038"
+            ],
+            "retrieved": [
+              "4b5b761581-0038",
+              "4b5b761581-0040",
+              "6ff73b3a35-0035",
+              "dd4c9e923a-0025",
+              "2e4de1175a-0067"
+            ]
+          },
+          {
+            "question": "¿Cuáles son las contraindicaciones principales que figuran en las fichas de metamizol y de ketamina?",
+            "relevant": [
+              "4a22951867-0019",
+              "cc623ee4ba-0012"
+            ],
+            "retrieved": [
+              "4a22951867-0029",
+              "4a22951867-0038",
+              "cc623ee4ba-0022",
+              "4a22951867-0022",
+              "cc623ee4ba-0026"
+            ]
+          },
+          {
+            "question": "¿Qué condiciones de conservación y periodo de validez se establecen para las presentaciones de clindamicina y fluconazol?",
+            "relevant": [
+              "eaf11ccc56-0026",
+              "eaf11ccc56-0027"
+            ],
+            "retrieved": [
+              "a77c0b5e80-0009",
+              "f4186ec002-0055",
+              "f51b195350-0042",
+              "eaf11ccc56-0012",
+              "8a0b991483-0039"
+            ]
+          },
+          {
+            "question": "¿cuánto me dura la vancomicina ya preparada?",
+            "relevant": [
+              "c4e87629e9-0057"
+            ],
+            "retrieved": [
+              "c4e87629e9-0022",
+              "c4e87629e9-0042",
+              "c4e87629e9-0000",
+              "f4186ec002-0016",
+              "c4e87629e9-0055"
+            ]
+          },
+          {
+            "question": "heparina sódica conservación",
+            "relevant": [
+              "cd3276205b-0035",
+              "ba642d0da7-0043",
+              "228d4cf6f2-0023",
+              "cc623ee4ba-0038",
+              "35338e7823-0030",
+              "82d84e405c-0023",
+              "61c53c802c-0044"
+            ],
+            "retrieved": [
+              "ba642d0da7-0000",
+              "ba642d0da7-0005",
+              "ba642d0da7-0047",
+              "ba642d0da7-0045",
+              "ba642d0da7-0002"
+            ]
+          },
+          {
+            "question": "Paciente de 80 años con aclaramiento de creatinina de 20 mL/min, ¿tengo que reducir la dosis de levofloxacino?",
+            "relevant": [
+              "f4186ec002-0013"
+            ],
+            "retrieved": [
+              "f4186ec002-0011",
+              "cd3276205b-0010",
+              "cd3276205b-0009",
+              "f4186ec002-0012",
+              "9b357fbf8e-0015"
+            ]
+          },
+          {
+            "question": "¿Puedo poner la amiodarona en suero fisiológico o solo en glucosado?",
+            "relevant": [
+              "4b5b761581-0056"
+            ],
+            "retrieved": [
+              "4b5b761581-0011",
+              "daf29b9941-0034",
+              "4b5b761581-0023",
+              "4b5b761581-0017",
+              "4b5b761581-0036"
+            ]
+          },
+          {
+            "question": "Mi paciente se ha pasado de dosis de morfina, ¿qué hago?",
+            "relevant": [
+              "2477b4c7fd-0052"
+            ],
+            "retrieved": [
+              "2477b4c7fd-0016",
+              "2477b4c7fd-0033",
+              "2477b4c7fd-0034",
+              "2477b4c7fd-0021",
+              "2477b4c7fd-0014"
+            ]
+          },
+          {
+            "question": "Un vial de imipenem/cilastatina de 500 mg/500 mg se prepara en el volumen de solución de perfusión que indica la ficha. ¿Qué concentración de imipenem, en mg/mL, resulta?",
+            "relevant": [
+              "d37f178e35-0065"
+            ],
+            "retrieved": [
+              "d37f178e35-0005",
+              "d37f178e35-0003",
+              "d37f178e35-0000",
+              "d37f178e35-0023",
+              "d37f178e35-0063"
+            ]
+          }
+        ]
+      },
+      "lambda_sweep": {
+        "0.0": {
+          "recall@5": 0.5780141843971631,
+          "mrr": 0.6031323877068557,
+          "n_questions": 47
+        },
+        "0.1": {
+          "recall@5": 0.5780141843971631,
+          "mrr": 0.6159827760891591,
+          "n_questions": 47
+        },
+        "0.2": {
+          "recall@5": 0.5780141843971631,
+          "mrr": 0.6266210739614995,
+          "n_questions": 47
+        },
+        "0.3": {
+          "recall@5": 0.5833333333333333,
+          "mrr": 0.6466312056737589,
+          "n_questions": 47
+        },
+        "0.4": {
+          "recall@5": 0.5833333333333333,
+          "mrr": 0.6365501519756839,
+          "n_questions": 47
+        },
+        "0.5": {
+          "recall@5": 0.6046099290780141,
+          "mrr": 0.6296690307328605,
+          "n_questions": 47
+        },
+        "0.6": {
+          "recall@5": 0.5939716312056738,
+          "mrr": 0.5385005065856129,
+          "n_questions": 47
+        },
+        "0.7": {
+          "recall@5": 0.5141843971631205,
+          "mrr": 0.49701114488348536,
+          "n_questions": 47
+        },
+        "0.8": {
+          "recall@5": 0.48581560283687947,
+          "mrr": 0.44698581560283684,
+          "n_questions": 47
+        },
+        "0.9": {
+          "recall@5": 0.4539007092198582,
+          "mrr": 0.42452718676122936,
+          "n_questions": 47
+        },
+        "1.0": {
+          "recall@5": 0.4751773049645391,
+          "mrr": 0.416869300911854,
+          "n_questions": 47
+        }
+      }
+    }
+  }
+}
