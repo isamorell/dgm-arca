@@ -910,3 +910,481 @@ sea un inyectable permitirá medir si esta limitación pesa en la práctica. Si 
 quedará documentado con esta entrada como causa probable.
 
 ---
+
+### 2026-10-27 · Fase 2 · Banco de pruebas de herramientas: Qwen3-0.6B y Qwen3-1.7B, con y sin herramientas
+
+**Qué queríamos saber.** Tres cosas: si el modelo elige la herramienta correcta y le pasa los
+argumentos correctos, si las herramientas mejoran la respuesta final frente a no tenerlas, y dónde
+falla y por qué. La hipótesis de la entrada "Una calculadora de dosis" era que, con
+`dose_calculator`, desaparecerían los errores aritméticos de la fase 1.
+
+**Qué hicimos.** Un banco de 30 casos en español (`tool_use/bench/cases.jsonl`), escrito y
+revisado a mano **antes** de ejecutar y sin tocar ningún caso después de ver resultados:
+
+| Tipo | Casos | Qué se espera |
+|---|---|---|
+| Consulta CIMA | 6 | `search_medication_cima` (uno con paracetamol IV, la limitación anotada arriba) |
+| Conversión | 5 | `convert_units` |
+| Cálculo de dosis | 7 | `dose_calculator` |
+| Hoja PDF | 3 | `create_preparation_sheet` |
+| Encadenados | 3 | varias herramientas en orden (CIMA y cálculo, conversión y cálculo, cálculo y hoja) |
+| Sin herramienta | 6 | ninguna (teoría, saludo, un fármaco mencionado sin pedir datos de CIMA) |
+
+Métricas (`tool_use/evaluate.py`):
+
+- **Selección:** la primera llamada es la herramienta esperada (o no hay llamada si no hace falta).
+- **Argumentos:** se comparan por significado: las expresiones por su valor (`15*70` es `70 * 15`),
+  las unidades por conversión (`µg` es `mcg`) y los argumentos opcionales en su valor por defecto
+  cuentan como puestos. Damos dos cifras: **estricta** y **sin contar los opcionales** que el caso
+  no fija (`max_results`, `decimals`), porque elegir 10 resultados en vez de 5 no es una llamada
+  incorrecta. El campo `steps` de la hoja solo debe existir.
+- **Respuesta final:** el texto contiene el número esperado. Solo existe en los 15 casos con
+  resultado numérico (conversión, cálculo y 3 encadenados). Es una heurística: no distingue un
+  número correcto en una frase equivocada.
+- **Con y sin herramientas:** mismo modelo y mismos casos. Sin herramientas cambia el prompt de
+  sistema (una instrucción neutra) y no hay definiciones.
+
+Modelos: `Qwen/Qwen3-0.6B` y `Qwen/Qwen3-1.7B` tal cual, sin nuestro SFT ni GRPO. Decodificación
+voraz, `enable_thinking=False`, 1024 tokens máximo, 5 turnos, una sola ejecución. La hoja PDF no
+se ejecutó (`allow_side_effects=False`): el modelo recibe que requiere confirmación.
+
+```bash
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-0.6B --out reports/phase2_eval_qwen3-0.6b.json
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-1.7B --out reports/phase2_eval_qwen3-1.7b.json
+uv run python -m tool_use.evaluate --rescore reports/phase2_eval_qwen3-0.6b.json   # sin modelo
+```
+
+**Una corrección de la medición.** La primera puntuación aceptaba un número dentro del 0,5 %, y
+daba por buenas las respuestas "41,75" y "41,76" para 41,7 (c18): son errores aritméticos reales.
+Bajamos la tolerancia (1e-4 relativa y 0,01 absoluta, de modo que 1,6667 sigue valiendo para 1,67) y
+volvimos a puntuar los dos ficheros con `--rescore`. Solo cambió esa respuesta en la condición sin
+herramientas de cada modelo. Los JSON de `reports/` ya llevan las cifras corregidas; el
+comportamiento crudo del modelo (llamadas y respuestas) no se tocó.
+
+**Qué pasó.**
+
+| | Qwen3-0.6B | Qwen3-1.7B |
+|---|---|---|
+| Selección de herramienta (30 casos) | 73,3 % (22) | 96,7 % (29) |
+| Argumentos, estricto | 63,3 % (19) | 70,0 % (21) |
+| Argumentos, sin contar opcionales | 70,0 % (21) | 86,7 % (26) |
+| Llamadas innecesarias (6 casos sin herramienta) | 0 | 0 |
+| Llamadas omitidas / herramienta equivocada (24 casos) | 2 / 6 | 0 / 1 |
+| Secuencia completa en los 3 encadenados | 0 | 0 |
+| Respuesta final correcta **con** herramientas (15 casos) | 40,0 % (6) · IC 19,8-64,3 | 60,0 % (9) · IC 35,7-80,2 |
+| Respuesta final correcta **sin** herramientas (15 casos) | 33,3 % (5) · IC 15,2-58,3 | 73,3 % (11) · IC 48,0-89,1 |
+
+Selección y argumentos por categoría (acierto de herramienta / argumentos estricto):
+
+| Categoría | 0.6B | 1.7B |
+|---|---|---|
+| CIMA (6) | 6 / 5 | 6 / 2 |
+| Conversión (5) | 3 / 2 | 5 / 5 |
+| Cálculo (7) | 1 / 1 | 6 / 3 |
+| Hoja PDF (3) | 3 / 3 | 3 / 3 |
+| Encadenados (3) | 3 / 2 | 3 / 2 |
+| Sin herramienta (6) | 6 / 6 | 6 / 6 |
+
+Qué falla, con ejemplos (ids de `cases.jsonl`):
+
+1. **Confunde `convert_units` con `dose_calculator`.** El 0.6B usa `convert_units` en los 6 casos
+   de cálculo que fallan (c13-c18) con argumentos sin sentido: `value: "1000 mg"` (texto),
+   `mg a mL` (error de tipo de unidad) o `500 L a mL`. El 1.7B casi lo evita (6 de 7), pero lo
+   repite en c15 (`mL a mL/h`) y en el segundo paso de c23 (`mcg a mL`).
+2. **El fallo está en plantear la expresión, no en calcularla.** El 1.7B llama a
+   `dose_calculator`, que calcula exacto, pero con la expresión mal planteada: multiplica en vez
+   de dividir (c14, `0.5 * 12 * 2.5`), olvida pasar a minutos (c16, `500 / 8`) o no multiplica por
+   los mL de la ampolla (c17, `40 / 20`). En c13 la herramienta devuelve `100.0` y el modelo
+   contesta "1000 mL", en inglés.
+3. **Tras un error de herramienta, nunca prueba otra herramienta.** De 6 llamadas con error
+   (4 del 0.6B y 2 del 1.7B), ninguna va seguida de una llamada correcta. El 1.7B se recupera
+   calculando él mismo y acierta (c15, c23); el 0.6B se rinde (c13, c14, c17), calcula mal solo
+   (c18) o da por buena una salida absurda: 500000 mL/h en c15 y c16.
+4. **CIMA: elige bien y lee regular.** Con paracetamol IV (c05) la lista es toda oral. El 0.6B
+   responde que la presentación intravenosa es un comprimido efervescente; el 1.7B nota que son
+   orales ("no se menciona una presentación intravenosa directamente"). En c22 ambos piden
+   `max_results: 1`, reciben una sola presentación oral de furosemida y nunca llegan a calcular.
+   El 1.7B elige `max_results` distinto cada vez (10, 5, 3, 1), y por eso la cifra estricta de
+   CIMA baja a 2/6 aunque las 6 llamadas son razonables.
+5. **Ningún encadenado se completa.** c22 se para tras CIMA; en c23 el 0.6B llama a CIMA en vez de
+   a la calculadora y el 1.7B repite `convert_units` (`mcg a mL`); en c24 el 0.6B se para tras el
+   primer cálculo y el 1.7B se salta el cálculo del volumen y se inventa "500 mg, 10 mL" (esperado:
+   12,5 mL; la hoja no se ejecutó).
+6. **Con y sin herramientas.** Por categoría, las herramientas ayudan en conversión (0.6B: 4/5 frente
+   a 2/5; 1.7B: 5/5 frente a 4/5) y **perjudican en cálculo** (0.6B: 1/7 frente a 3/7; 1.7B: 3/7
+   frente a 5/7). Caso a caso, el 1.7B gana con herramientas en 2 casos (c11, una conversión que
+   el texto no resuelve, y c18, donde la calculadora da 41,7 y sin ella 41,76) y pierde en 4
+   (c13, c14, c17, c24). El 0.6B gana en 4 (c08, c11, c12, c24) y pierde en 3 (c13, c14, c15); en
+   c08 no llamó a ninguna herramienta, así que esa diferencia viene del prompt y no de la
+   herramienta. Un test de signos da p = 0,69 (1.7B) y p = 1,0 (0.6B): no hay evidencia de efecto.
+
+**Qué concluimos.**
+
+- **Tamaño.** El paso de 0.6B a 1.7B mejora mucho la selección (73 % a 97 %) y bastante los
+  argumentos sin contar opcionales (70 % a 87 %), pero la respuesta final con herramientas sube
+  menos de lo que sube sin ellas. A 1.7B, usar herramientas no mejora la respuesta final en nuestro
+  banco (60 % frente a 73 %, con intervalos que se solapan).
+- **La hipótesis de la calculadora se cumple solo a medias.** Cuando el modelo llama a
+  `dose_calculator`, el número es exacto (c18), pero los errores que quedan son de planteamiento,
+  que una calculadora no corrige. Hipótesis, sin comprobar: con `enable_thinking=False` el modelo
+  escribe la expresión en el primer token, sin el razonamiento paso a paso con el que acierta
+  cuando responde solo (sin herramientas explica "volumen = dosis / concentración" y sustituye).
+- **La descripción de `convert_units` puede estar atrayendo al modelo.** Dice expresamente que no
+  convierte "mg a mL" y los errores del 0.6B y de c15/c23 van justo ahí. Es una hipótesis: no
+  hemos cambiado la descripción ni repetido la prueba.
+- **Límites.** 30 casos y solo 15 con respuesta numérica: los intervalos son anchos y las
+  diferencias entre condiciones no son significativas. Los casos de cálculo son sencillos (el 1.7B
+  sin herramientas acierta 5 de 7), así que la calculadora tiene poco margen. Las respuestas de
+  CIMA y las hojas no se puntúan en el texto final. Una sola ejecución voraz por modelo, con la
+  hoja sin ejecutar. Son los modelos Qwen3 tal cual: si el profesor pide el nuestro, habría que
+  repetir con `--model-id` (hecho después: ver la entrada "Banco de herramientas con nuestro
+  modelo").
+- **Por probar.** Reescribir la descripción de `convert_units` y repetir solo los casos
+  de cálculo (hecho después, quitando los ejemplos: ver la entrada "Descripciones de las
+  herramientas sin ejemplos"); devolver en los errores de `convert_units` una pista ("para multiplicar o dividir
+  usa `dose_calculator`"); dejar razonar al modelo antes de llamar; casos de cálculo más difíciles,
+  como los de la fase 1.
+
+---
+
+### 2026-10-27 · Fase 2 · Banco de herramientas con nuestro modelo (SFT y GRPO sin KL)
+
+**Qué queríamos saber.** Si nuestro modelo de la fase 1 (Qwen3-0.6B con adaptador LoRA) usa las
+herramientas mejor que el Qwen3-0.6B del que parte. La entrada anterior se hizo con Qwen3 tal
+cual. El profesor contestó por correo que el modelo razonador debe usarse para generar las
+respuestas y guiar al agente, incluida la selección de herramientas; que es de esperar que un
+modelo ajustado a nuestro problema supere a un Qwen base; y que los Qwen del repositorio plantilla
+son solo una referencia. Teresa pidió probarlo antes de tocar `tools.py`.
+
+Hipótesis, escrita antes de ejecutar: la respuesta final mejoraría (el adaptador se entrenó
+justo en estos cálculos), pero el uso de herramientas podía empeorar, porque el adaptador solo
+vio el formato `<think>…</think><answer>…</answer>` con otro prompt de sistema y nunca una
+llamada `<tool_call>`.
+
+**Qué hicimos.** El mismo banco de 30 casos, sin tocarlo, y las mismas métricas. En
+`tool_use/evaluate.py` (sin modificar `executor.py`, que no es nuestro) añadimos:
+
+- `--adapter`: aplica el LoRA sobre el modelo base con PEFT (carpeta local o repo de Hugging
+  Face), igual que `rlm/inference.py`. `ToolLoop.load()` solo carga el base.
+- `--thinking`: deja que el modelo escriba su `<think>`. El ejecutor fuerza
+  `enable_thinking=False`, que pre-rellena un bloque de razonamiento vacío; para un modelo
+  entrenado a abrirlo él mismo eso queda fuera de su distribución.
+- `--no-tools-prompt phase1`: en la condición sin herramientas usa el prompt de la fase 1 (R1-Zero)
+  en lugar del neutro, para no penalizar al adaptador en la línea base por usarlo fuera de formato.
+- El razonamiento no cuenta como respuesta: antes de buscar el número esperado se quita el bloque
+  `<think>`. Si el bloque queda sin cerrar, se descarta todo lo que sigue a `<think>`. El resumen
+  añade `unfinished_thinking_rate` (respuestas que abren `<think>` y no lo cierran).
+
+Los JSON de Qwen3 se puntúan igual con esta versión (comprobado con `--rescore`). La suite del
+banco pasa de 27 a 34 tests.
+
+Adaptadores: SFT (`raquelfes11/dgm-arca-sft-lora`) y GRPO sin KL (`rlm/weights/final_rlm_lora_sin_kl`,
+que es `isamorell/dgm-arca-rlm-lora-sin-kl`). Decodificación voraz, 1024 tokens, 5 turnos, una sola
+ejecución, hoja PDF sin ejecutar.
+
+```bash
+uv run python -m tool_use.evaluate --adapter rlm/weights/final_rlm_lora_sin_kl --thinking \
+  --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_grpo.json
+uv run python -m tool_use.evaluate --adapter raquelfes11/dgm-arca-sft-lora --thinking \
+  --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft.json
+```
+
+**Qué no permite separar esta prueba.** Los Qwen3 se ejecutaron con razonamiento desactivado y prompt
+neutro, y los adaptadores con razonamiento activado y prompt de fase 1. Cambian dos cosas a la vez
+(el adaptador y el modo de razonamiento) y no podemos repartir el efecto entre ellas.
+
+**Qué pasó.**
+
+| | Qwen3-0.6B | Qwen3-1.7B | 0.6B + SFT | 0.6B + GRPO sin KL |
+|---|---|---|---|---|
+| Selección de herramienta (30 casos) | 73,3 % (22) | 96,7 % (29) | 60,0 % (18) | 56,7 % (17) |
+| Argumentos, estricto | 63,3 % (19) | 70,0 % (21) | 50,0 % (15) | 46,7 % (14) |
+| Argumentos, sin contar opcionales | 70,0 % (21) | 86,7 % (26) | 50,0 % (15) | 50,0 % (15) |
+| Llamadas innecesarias (6 casos sin herramienta) | 0 | 0 | 0 | 0 |
+| Llamadas omitidas / herramienta equivocada (24 casos) | 2 / 6 | 0 / 1 | 11 / 1 | 10 / 3 |
+| Secuencia completa en los 3 encadenados | 0 | 0 | 0 | 1 |
+| Respuesta final **con** herramientas (15 casos) | 40,0 % (6) · IC 19,8-64,3 | 60,0 % (9) · IC 35,7-80,2 | 73,3 % (11) · IC 48,0-89,1 | 66,7 % (10) · IC 41,7-84,8 |
+| Respuesta final **sin** herramientas (15 casos) | 33,3 % (5) · IC 15,2-58,3 | 73,3 % (11) · IC 48,0-89,1 | 80,0 % (12) · IC 54,8-93,0 | 80,0 % (12) · IC 54,8-93,0 |
+| `<think>` sin cerrar (con / sin herramientas, de 30) | no aplica | no aplica | 5 / 4 | 5 / 1 |
+
+Selección y argumentos por categoría (acierto de herramienta / argumentos estricto):
+
+| Categoría | Qwen3-0.6B | Qwen3-1.7B | 0.6B + SFT | 0.6B + GRPO sin KL |
+|---|---|---|---|---|
+| CIMA (6) | 6 / 5 | 6 / 2 | 5 / 5 | 5 / 4 |
+| Conversión (5) | 3 / 2 | 5 / 5 | 3 / 1 | 2 / 1 |
+| Cálculo (7) | 1 / 1 | 6 / 3 | 0 / 0 | 0 / 0 |
+| Hoja PDF (3) | 3 / 3 | 3 / 3 | 3 / 3 | 3 / 3 |
+| Encadenados (3) | 3 / 2 | 3 / 2 | 1 / 0 | 1 / 0 |
+| Sin herramienta (6) | 6 / 6 | 6 / 6 | 6 / 6 | 6 / 6 |
+
+Comparaciones caso a caso sobre los 15 casos con respuesta numérica (test de signos exacto,
+bilateral; "+" son casos que acierta el primero y no el segundo):
+
+| Comparación | + | − | p |
+|---|---|---|---|
+| SFT sin herramientas frente a Qwen3-0.6B sin herramientas | 7 | 0 | 0,016 |
+| GRPO sin herramientas frente a Qwen3-0.6B sin herramientas | 7 | 0 | 0,016 |
+| SFT con herramientas frente a Qwen3-0.6B con herramientas | 6 | 1 | 0,125 |
+| GRPO con herramientas frente a Qwen3-0.6B con herramientas | 5 | 1 | 0,219 |
+| SFT con herramientas frente a Qwen3-1.7B con herramientas | 5 | 3 | 0,727 |
+| GRPO con herramientas frente a Qwen3-1.7B con herramientas | 5 | 4 | 1,0 |
+| GRPO frente a SFT, sin herramientas | 0 | 0 | 1,0 |
+| GRPO frente a SFT, con herramientas | 0 | 1 | 1,0 |
+
+Qué ocurre, con ejemplos (ids de `cases.jsonl`):
+
+1. **En cálculo no llama a la herramienta y lo resuelve él.** Con los dos adaptadores `dose_calculator`
+   se usa en 0 de 7 casos de cálculo, pero la respuesta final es correcta en 6 de 7 (solo falla
+   c18), con y sin herramientas. El modelo se entrenó para razonar la aritmética y la hace bien en
+   estos casos sencillos; nunca aprendió a delegarla. Es la causa de que las llamadas omitidas
+   pasen del 8 % (Qwen3-0.6B) al 42-46 %.
+2. **Sin herramientas mejora mucho frente a su base.** 12 de 15 frente a 5 de 15, con los mismos 7
+   casos a favor en los dos adaptadores (c08, c10, c12, c16, c17, c23, c24) y ninguno en contra
+   (p = 0,016: significativo incluso con 15 casos). Frente al Qwen3-1.7B, 12 frente a 11
+   (un caso, c16). Con herramientas el 0.6B + SFT queda al nivel del 1.7B (11 frente a 9, no
+   significativo) por otro camino: sin usarlas bien, mientras que el 1.7B las elige casi siempre.
+3. **El SFT y el GRPO se comportan igual.** Sin herramientas aciertan exactamente los mismos 12
+   casos; con herramientas solo difieren en c23. En la fase 1 el GRPO sin KL superaba al SFT (89,5 %
+   frente a 80,5 % en test y 30 % frente a 24 % en OOD), pero este banco no los distingue. El
+   comportamiento con herramientas viene ya del SFT o del formato, no del GRPO.
+4. **`convert_units` falla en la validación, por tres causas.** Con el SFT fallan 5 de 5 llamadas
+   y con el GRPO 5 de 6: valor con la unidad pegada (`"6 mg"`, `"100 mL/h"`, `"0,25 mg"`), coma
+   decimal (`"0,5"`) y unidad troceada (c10: de `h` a `min` en lugar de `mL/h` a `mL/min`; c11
+   con el SFT: de `mg` a `mg/lb`, perdiendo el `/kg`). Después no repite la llamada corregida:
+   calcula él mismo. En c10 el GRPO ignora el resultado de la herramienta (6000) y contesta
+   "1,7" (esperado 1,67). En c11 contesta 11,0 mg/lb, cuando lo correcto es 2,27.
+5. **Deja el `<think>` sin cerrar.** En 5 de 30 respuestas con herramientas en cada adaptador
+   (GRPO: c01, c02, c10, c20, c23; SFT: c03, c10, c11, c18, c21) el modelo escribe la respuesta
+   dentro del bloque y termina sin `</think>`. En el GRPO solo c02 parece cortado por el límite
+   de tokens (por la longitud del texto); el resto termina sin cerrar. Con la puntuación
+   estricta esa respuesta cuenta como vacía. Afecta a c23 con el GRPO: contesta bien ("1 mL")
+   pero dentro del bloque. Contando ese caso, el GRPO con herramientas tendría 11 de 15, igual
+   que el SFT. c10 es un error real (1,7). Así, la diferencia entre "sin herramientas" (12) y
+   "con herramientas" (10 y 11) se explica sobre todo por el formato y no por las herramientas.
+   No cambiamos la puntuación (el banco está congelado) y lo dejamos anotado.
+6. **Contesta de memoria cuando debería consultar CIMA.** En c06 los dos adaptadores responden
+   "La presentación del omeprazol es 40 mg/2 mL" sin llamar a `search_medication_cima`. En c05 el
+   GRPO presenta un comprimido oral como "presentación intravenosa" (el SFT contesta bien que no
+   hay). Las métricas numéricas no lo recogen y es el fallo más serio para un asistente de
+   enfermería.
+7. **Una herramienta con efectos secundarios, llamada sin pedirla.** En c23 el SFT llama a
+   `create_preparation_sheet` sin que nadie se lo haya pedido y rellena `steps` con el ejemplo de
+   su descripción (`15 mg/kg x 70 kg = 1050 mg`). El ejecutor la bloqueó porque la herramienta
+   exige confirmación (evaluamos con `allow_side_effects=False`), así que no se creó ningún PDF.
+   Es el único caso, y apoya la política de confirmación. Por eso la secuencia de c23 no cuenta
+   como correcta. En los 6 casos sin herramienta ningún adaptador llama a nada de más.
+
+**Qué concluimos.**
+
+- **La hipótesis se cumple.** La respuesta final mejora (sin herramientas con significación
+  estadística) y el uso de herramientas empeora: la selección baja del 73 % al 57-60 % y las
+  llamadas omitidas suben del 8 % al 42-46 %. El adaptador no vio nunca una llamada a herramienta
+  y resuelve solo lo que sabe resolver.
+- **Eso apoya el apartado "para ir más allá" (SFT para uso de herramientas).** Entrenar con trazas
+  que incluyan `<tool_call>` (y cierren bien el `<think>`) atacaría los tres problemas: no
+  delegar el cálculo, el formato de los argumentos y el cierre del razonamiento.
+- **No hemos activado el modelo entrenado en la aplicación.** `ToolLoop.load()` carga solo el
+  modelo base, así que el endpoint `/tools` sirve hoy Qwen3-0.6B sin adaptador. `evaluate.py` sí
+  lo aplica con `--adapter`. Dado que con el adaptador baja la selección, qué modelo servir en
+  `/tools` es una decisión del equipo que no hemos tomado.
+- **Límites.** 15 casos con respuesta numérica; una ejecución voraz por modelo; el adaptador y el
+  modo de razonamiento cambian a la vez; SFT y GRPO no son distinguibles con este banco; y la
+  puntuación estricta penaliza las respuestas con el `<think>` sin cerrar.
+- **Por probar (no hecho).** Qwen3-0.6B con `--thinking` y los adaptadores con
+  `enable_thinking=False`, para repartir el efecto entre el adaptador y el modo de razonamiento;
+  casos de cálculo más difíciles, como los de la fase 1; un SFT con trazas de uso de herramientas.
+
+---
+
+### 2026-10-27 · Fase 2 · Descripciones de las herramientas sin ejemplos
+
+**Qué queríamos saber.** Si quitar los ejemplos de las descripciones mejora el uso de las
+herramientas. Hay dos motivos. El primero: los fallos de `convert_units` son valores con la unidad
+pegada (`"6 mg"`), la forma de los ejemplos de su descripción ("0.5 g to mg"), y una compañera
+propuso quitarlos. El segundo, descubierto al revisarlo: los ejemplos coinciden con casos del banco.
+Los de conversión son c07 (0,5 g a mg), c10 (100 mL/h a mL/min) y c11 (5 mg/kg a mg/lb); en
+`dose_calculator` aparecían `500 / (8 * 60)` (la expresión esperada de c16) y `(0.5 * 12) / 2.5`
+(la de c14); y el `1050 mg` de `create_preparation_sheet` se coló en una llamada de c23. Si el
+cambio ayudaba, se lo propondríamos a Teresa, autora de `tools.py`.
+
+**Qué hicimos.** En una rama aparte (`exp_convert_desc`, no en `main`) quitamos solo los ejemplos de
+tres descripciones, dejando las instrucciones (por ejemplo, "no convierte entre magnitudes
+distintas: usa `dose_calculator`"):
+
+- `convert_units`: la línea de conversiones de ejemplo.
+- `dose_calculator`: las expresiones de ejemplo, en la descripción y en el argumento.
+- `create_preparation_sheet`: los valores de ejemplo de los cinco argumentos.
+
+No tocamos la lista de unidades de `from_unit` (incluye `'h'` y `'mg/kg/h'`) ni los ejemplos de
+`search_medication_cima` (`paracetamol`, `ibuprofeno`, `furosemida`, que también aparecen en c01,
+c02 y c05). Solo repetimos la condición con herramientas, porque la descripción no influye en la
+otra. Los 77 tests de herramientas, registro, parser, banco y ejecutor pasan con el cambio.
+
+```bash
+uv run python -m tool_use.evaluate --conditions tools \
+  --out reports/phase2_eval_qwen3-0.6b_desc.json
+uv run python -m tool_use.evaluate --conditions tools --adapter raquelfes11/dgm-arca-sft-lora \
+  --thinking --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft_desc.json
+```
+
+**Qué pasó.**
+
+| Solo con herramientas | Qwen3-0.6B, con ejemplos | Qwen3-0.6B, sin ejemplos | 0.6B + SFT, con ejemplos | 0.6B + SFT, sin ejemplos |
+|---|---|---|---|---|
+| Selección (30) | 73,3 % (22) | 76,7 % (23) | 60,0 % (18) | 56,7 % (17) |
+| Argumentos, estricto | 63,3 % (19) | 66,7 % (20) | 50,0 % (15) | 53,3 % (16) |
+| Llamadas omitidas / herramienta equivocada (24) | 2 / 6 | 1 / 6 | 11 / 1 | 11 / 2 |
+| Respuesta final (15) | 40,0 % (6) | 40,0 % (6) | 73,3 % (11) | 73,3 % (11) |
+| Llamadas a `convert_units` / con error | 10 / 4 | 17 / 13 | 5 / 5 | 5 / 4 |
+| Llamadas totales a herramientas | 23 | 31 | 15 | 18 |
+| `<think>` sin cerrar (de 30) | no aplica | no aplica | 5 | 8 |
+
+- **Los cambios se compensan.** Con el 0.6B cambian 7 casos y el balance neto es de uno (c08 ahora
+  llama bien a `convert_units`); en la respuesta final c15 se gana y c24 se pierde (ahora llama a
+  la hoja pero no da el número). Con el SFT, c06 pasa a consultar CIMA y c11 sale bien, pero c07 y
+  c10 dejan de llamar a la herramienta y c14 pierde la respuesta (la conversión baja de 3 a 1 en
+  selección). La comparación caso a caso de la respuesta final es de un caso a favor y uno en
+  contra en las dos parejas.
+- **Con el 0.6B base empeora un aspecto.** Las llamadas erróneas a `convert_units` pasan de 4 a 13:
+  en c17 repite la misma llamada fallida 5 veces seguidas y en c18 3 veces, cuando antes la
+  intentaba una sola. Los errores restantes son de otro tipo: convertir `mg` a `mL` (c13, c17,
+  c18), algo que la descripción ya prohíbe, o trocear la unidad (`mL` a `mL/min`, c10, c15, c16).
+- **La hipótesis del texto pegado al número no se confirma.** Con el 0.6B, los valores con unidad
+  pasan de 2 a 1; con el SFT se mantienen (`"0,5 mg/kg"`, `"500 mL"`, `"0,25 mg"` dos veces).
+- **Un único efecto visible.** En c23 el SFT ya no llama a `create_preparation_sheet` sin que se
+  la pidan: no hay ninguna llamada a la hoja fuera de los casos donde se pedía. Es un caso, pero
+  encaja con que el ejemplo (`1050 mg`) se estaba filtrando.
+- **Sobre la validez del banco.** Al quitar los ejemplos que coincidían con los casos, el 0.6B base
+  no empeora (73 % a 77 % en selección). Sugiere que el solapamiento no inflaba sus resultados.
+
+**Qué concluimos.** Quitar los ejemplos no mejora el uso de herramientas con ninguno de los dos
+modelos: las diferencias caen dentro del ruido de 30 casos y una ejecución voraz, y la respuesta
+final no cambia. El cuello de botella no está en las descripciones sino en el modelo, que no
+distingue para qué sirve cada herramienta (base) o no se entrenó para llamarlas (SFT). Por eso no
+proponemos el cambio a Teresa como mejora de exactitud, y `tools.py` de `main` no se modifica.
+Queda como opción de higiene (quitar de las descripciones ejemplos que coinciden con casos del
+banco), que decide el equipo.
+
+Límites: una sola ejecución por configuración, con 30 casos; cambiar una descripción altera las
+salidas de forma poco predecible, así que 7 casos modificados no son todos efecto del cambio; se
+cambiaron las tres herramientas a la vez; la lista de unidades de `from_unit` y los ejemplos de CIMA
+siguen en su sitio.
+
+Por probar (no hecho): devolver en el error de `convert_units` una pista ("para multiplicar o
+dividir usa `dose_calculator`"); aceptar valores con coma decimal (`"0,5"`), con cuidado de no
+ocultar errores de unidades en un dominio clínico; quitar `'h'` y `'mg/kg/h'` de la lista de
+unidades de `from_unit`.
+
+---
+
+### 2026-10-27 · Fase 2 · Una frase en el prompt para los encadenados (multi-step)
+
+**Qué queríamos saber.** Si se puede arreglar con el prompt de sistema el fallo más repetido del
+banco: ningún modelo completa los casos encadenados (c22, c23 y c24). Lo vimos también al probar
+`POST /tools` a mano: ante "busca la furosemida inyectable en CIMA y dime cuántos mL necesito para
+dar 40 mg", el modelo busca en CIMA, recibe un comprimido oral de 40 mg y contesta "40 mL" sin llamar a
+`dose_calculator`. La hipótesis era que el modelo se da por satisfecho tras el primer resultado y que
+bastaba pedirle que siga hasta resolver toda la petición.
+
+**Qué hicimos.** Un único cambio en `SYSTEM_PROMPT_TEMPLATE` de `tool_use/executor.py`, en la rama
+`exp_prompt_multistep` (no mergeada), sin ejemplos concretos para no volver a solapar con casos del
+banco:
+
+> Some tasks need several tools in sequence. After each result, check whether the user's request
+> is fully solved; if not, call the next tool. Answer only when every part of the request is done.
+
+Las descripciones de las herramientas son las originales (con ejemplos), así que la comparación
+justa es con las primeras ejecuciones. Solo la condición con herramientas, mismos parámetros que
+antes, una ejecución voraz por modelo:
+
+```bash
+uv run python -m tool_use.evaluate --conditions tools \
+  --out reports/phase2_eval_qwen3-0.6b_prompt.json
+uv run python -m tool_use.evaluate --conditions tools --adapter raquelfes11/dgm-arca-sft-lora \
+  --thinking --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft_prompt.json
+```
+
+**Qué pasó.**
+
+| Solo con herramientas | Qwen3-0.6B, sin la frase | Qwen3-0.6B, con la frase | 0.6B + SFT, sin la frase | 0.6B + SFT, con la frase |
+|---|---|---|---|---|
+| Selección (30) | 73,3 % (22) | 80,0 % (24) | 60,0 % (18) | 63,3 % (19) |
+| Argumentos, estricto | 63,3 % (19) | 70,0 % (21) | 50,0 % (15) | 53,3 % (16) |
+| Llamadas omitidas / herramienta equivocada (24) | 2 / 6 | 0 / 6 | 11 / 1 | 9 / 2 |
+| **Secuencia correcta en los 3 encadenados** | **0** | **0** | **0** | **0** |
+| Encadenados, selección / argumentos (3) | 3 / 2 | 3 / 2 | 1 / 0 | 1 / 0 |
+| Respuesta final (15) | 40,0 % (6) | 33,3 % (5) | 73,3 % (11) | 73,3 % (11) |
+| Llamadas totales / con error | 23 / 4 | 31 / 9 | 15 / 5 | 17 / 5 |
+
+- **Los encadenados no mejoran con ningún modelo.** Con el 0.6B, c22 se sigue parando tras CIMA y
+  contesta "40 mL"; c23 hace dos `convert_units` seguidos, el segundo de `mL` a `mL`, y acaba con
+  "500 mL"; c24 llama a `create_preparation_sheet` justo después del cálculo y, al no poder
+  ejecutarla, pide confirmación sin dar la dosis (antes sí la daba: pierde la respuesta correcta).
+  Con el SFT, c22 y c24 no hacen ninguna llamada: razonan que van a usar la herramienta y terminan
+  sin cerrar el `</think>` y sin hacerla; c23 es idéntico al de antes, con la llamada a la hoja
+  que nadie había pedido.
+- **Lo que sube no tiene que ver con encadenar.** Con el 0.6B, c08 y c09 (conversiones sencillas)
+  ahora llaman bien a `convert_units`, lo que explica el +2 en selección y en argumentos. Con el
+  SFT, c12 llama a `dose_calculator`, c06 consulta CIMA y c02 deja de hacerlo: cambios de un caso
+  que se compensan, con la respuesta final igual (11 de 15).
+- **Con el 0.6B base, el coste es real.** Las llamadas pasan de 23 a 31 y las erróneas de 4 a 9:
+  en c14 repite 4 veces la misma llamada fallida y en c18 3 veces. La respuesta final baja de 6 a 5
+  por c24.
+
+**Qué concluimos.** Es un resultado negativo: pedir en el prompt que se siga llamando a herramientas
+no mejora los encadenados con ninguno de los dos modelos. El fallo no es que el modelo se pare antes
+de tiempo, sino que no sabe qué herramienta toca después: elige `convert_units` o repite la
+anterior, o ni siquiera llama a la primera. Eso apunta a la falta de entrenamiento en llamadas
+encadenadas, no al prompt, y refuerza el apartado "para ir más allá" (SFT con trazas de varias
+herramientas). El cambio no se lleva a `main`: la rama `exp_prompt_multistep` queda como registro.
+El resultado también explica por qué el endpoint `/tools` falla en peticiones encadenadas con el
+modelo actual, algo que hay que tener presente al decidir qué modelo sirve.
+
+Límites: una sola frase, redactada en inglés y sin variantes (por ejemplo, una más explícita sobre
+el paso siguiente); una sola ejecución voraz por modelo con 30 casos; solo los modelos de 0.6B (el
+1.7B no se probó); y con solo 3 casos encadenados, cualquier mejora pequeña no se habría detectado.
+
+---
+
+### 2026-10-27 · Fase 3 · Generación del corpus
+
+**Qué queríamos saber.** Queríamos generar un corpus con información técnica de unos 45/50 medicamentos, para que el modelo pudiese obtener información actualizada sobre los medicamentos disponibles, su posología y posibles incompatibilidades y precauciones. 
+
+**Qué hicimos.** Para obtener estos documentos, hemos realizado consultas a la API de CIMA y hemos generado los documentos ejecutando el fichero `rag/download_corpus.py`.
+
+Para más información sobre como recuperar el corpus, su contenido y la licencia, leer el documento:
+
+`rag/CORPUS_README.md`
+
+Este documento se encuentra fuera de la carpeta de corpus/ ya que los documentos de nuestro corpus son ficheros .md y no queríamos que el README.md se incorporase al corpus.
+
+**Qué pasó.** Hemos obtenido la información técnica relevante para nuestro caso de uso de 47 medicamentos. Estos se encuentran especificados en la variable DRUGS del fichero `rag/download_corpus.py`.
+
+**Qué concluimos.** Una vez tenemos el corpus, podemos generar el conjunto dorado que utilizaremos como ground truth para medir y comparar el rendimiento de las diferentes estrategias de chunking; además de poder calcular el Recall@k y MRR para los tres retrievers.
+
+---
+
+### 2026-10-28 · Fase 3 · Construcción del conjunto dorado (gold) para evaluar el RAG
+
+**Qué queríamos saber.** Queremos tener de un conjunto dorado de 50 preguntas, cada una con la evidencia (el fragmento de texto del corpus que la responde), para comparar de forma objetiva los distintos retrievers y las distintas estrategias de chunking. Además, queremos que la mezcla de tipos de pregunta permita ver si el sistema falla en alguna categoría concreta.
+
+**Qué hicimos.** El gold se escribió a mano a partir de las fichas técnicas del corpus: para cada pregunta se localizó la evidencia en el texto original y se anotó en `evidence` junto con una nota sobre las secciones implicadas. Este conjunto de datos se puede encontrar en `rag/gold/gold.jsonl`. Las preguntas se reparten así:
+
+| Categoría | Nº | Descripción |
+|---|---|---|
+| Un medicamento, una sección | 15 | La respuesta está en una única sección continua. Se variaron medicamentos y secciones para no sesgar la evaluación. |
+| Un medicamento, varias secciones | 8 | La respuesta requiere combinar secciones no necesariamente consecutivas. |
+| Varios medicamentos | 8 | La respuesta combina información de una o varias secciones de fichas distintas. |
+| Inversas (de síntoma a fármaco) | 8 | Se describe un síntoma o característica y la respuesta es el medicamento y la sección donde se recoge el síntoma o característica descritos. |
+| Lenguaje coloquial | 5 | Redactadas sin terminología técnica, como las formularía un estudiante de Enfermería. |
+| Premisa dudosa | 3 | La pregunta contiene una suposición incorrecta o no respaldada por el corpus. Se espera que el sistema devuelva el texto donde se meustra que la suposición es incorrecta.|
+| Cálculo | 3 | Requieren recuperar datos de la ficha para utilizarse posteriormente en una operación. |
+
+Tras escribir y responder las preguntas, se ajustó la evidencia al tamaño de chunk previsto (`chunk_size=800`). Cuando una evidencia superaba ese tamaño, se dividió en dos o más fragmentos, que siguen asociados a la misma pregunta. Esto afectó a las preguntas 10, 16, 17, 19, 21, 25, 26 y 27 (numeración desde 1).
+
+**Qué pasó.** Se obtuvo un gold de 50 preguntas con evidencia verificada contra el texto original, en `rag/gold/gold.jsonl`. 8 de las 50 (16 %) tuvieron que partirse en varios fragmentos de evidencia, lo que ya indica que las respuestas largas no caben en un chunk de 800 caracteres. 
+
+**Qué concluimos.** Con este conjunto ya podemos medir la recuperación (recall@k y MRR) por categoría y no solo en global. Hay dos precauciones. Con 50 preguntas, las categorías pequeñas (3 de premisa dudosa, 3 de cálculo) dan resultados anecdóticos, así que se interpretarán como casos y no como porcentajes. Siguiente paso: evaluar las dos estrategias de chunking y los tres retrievers.
+
+---

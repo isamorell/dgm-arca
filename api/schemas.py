@@ -74,6 +74,7 @@ class ToolCallRecord(BaseModel):
     ok: bool = True
     error: str | None = None
     latency_ms: float = 0.0
+    requires_confirmation: bool = False
 
 
 class ToolsResponse(BaseModel):

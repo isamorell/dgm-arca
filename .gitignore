@@ -15,6 +15,9 @@ rlm/weights/*
 !rlm/weights/.gitkeep
 rag/corpus/*
 !rag/corpus/.gitkeep
+!rag/corpus/*.csv
+rag/raw/*
+!rag/raw/.gitkeep
 rag/index/
 outputs/
 runs/
