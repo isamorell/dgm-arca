@@ -12,6 +12,11 @@
         "max_chars": 1489
       },
       "n_unresolved": 16,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 7414,
+        "size_cuts": 12
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.36764705882352944,
@@ -51,6 +56,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 12,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 4731,
+        "size_cuts": 53
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.42105263157894735,
@@ -90,6 +100,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 10,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 3434,
+        "size_cuts": 108
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.39166666666666666,
@@ -129,6 +144,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 5,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 2258,
+        "size_cuts": 230
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.41481481481481475,
@@ -168,6 +188,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 3,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 1171,
+        "size_cuts": 389
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.4751773049645391,
@@ -207,6 +232,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 2,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 444,
+        "size_cuts": 535
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.4131944444444445,
@@ -246,6 +276,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 1,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 102,
+        "size_cuts": 615
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.4761904761904762,
@@ -285,6 +320,11 @@
         "max_chars": 1500
       },
       "n_unresolved": 1,
+      "cuts": {
+        "n_sections": 846,
+        "semantic_cuts": 12,
+        "size_cuts": 638
+      },
       "retrievers": {
         "bm25": {
           "recall@5": 0.5170068027210885,

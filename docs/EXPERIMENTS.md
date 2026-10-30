@@ -1396,7 +1396,7 @@ compararlo con el chunking recursivo y fijarlo en `rag/generate.py`.
 
 **Qué hicimos.** Primero miramos la distribución de las distancias entre frases consecutivas de
 todo el corpus y la gráfica de un documento (ceftriaxona), con el barrido que propone el
-docstring de `rag/chunking.py` (0.15 a 0.4, con 0.25 por defecto) y uno más alto:
+docstring de `rag/chunking.py` (0.15 a 0.4, con 0.25 por defecto). Sin embargo, 0.25 de threshold era demasiado bajo y troceaba practicamente por frases. Por lo tanto, probamos con un threshold más alto con el siguiente comando:
 
 `uv run python -m rag.chunking --doc ceftriaxona --sweep 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 --threshold 0.75 --out reports/rag/chunking_distances.png`
 
@@ -1407,8 +1407,9 @@ chunk cuenta como fallo. Embeddings con Qwen3-Embedding-0.6B y `max_chunk_chars=
 
 `uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --thresholds 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 --out reports/phase3_threshold_sweep.json`
 
-Por último, contamos por qué se cierra cada chunk: por superar el umbral (corte semántico), por
-superar los 1500 caracteres (corte por tamaño) o por empezar una sección nueva (846 secciones).
+El mismo comando cuenta también por qué se cierra cada chunk: por superar el umbral (corte
+semántico), por superar los 1500 caracteres (corte por tamaño) o por empezar una sección nueva
+(846 secciones). Por eso, en cada umbral, chunks = 846 + cortes semánticos + cortes por tamaño.
 
 **Qué pasó.** Las distancias en nuestro corpus son altas: p10 = 0.26, p25 = 0.39, p50 = 0.51,
 p75 = 0.65, p90 = 0.74, p95 = 0.78. Con los umbrales de ejemplo del docstring de `chunking.py` (0.15–0.4) salen entre
@@ -1421,9 +1422,11 @@ dentro de todas las secciones y los inicios de sección (líneas grises) no coin
 picos. Las fichas técnicas cambian de tema de una frase a otra (listas de reacciones adversas,
 tablas de dosis), así que el umbral no se puede elegir a ojo y lo elegimos con el barrido:
 
-| Umbral | Chunks | Media (car.) | Sin resolver | Cortes semánticos | Cortes por tamaño | Dense R@5 / MRR | Hybrid R@5 / MRR |
+| Umbral | Chunks | Media (car.) | Sin resolver | Cortes semánticos | Cortes por tamaño | Dense Recall@5 / MRR | Hybrid Recall@5 / MRR |
 |---|---|---|---|---|---|---|---|
+| 0.50 | 8272 | 198 | 16 | 7414 | 12 | 0.350 / 0.311 | 0.370 / 0.343 |
 | 0.60 | 5630 | 272 | 12 | 4731 | 53 | 0.433 / 0.428 | 0.447 / 0.458 |
+| 0.65 | 4388 | 338 | 10 | 3434 | 108 | 0.473 / 0.457 | 0.458 / 0.442 |
 | 0.70 | 3334 | 433 | 5 | 2258 | 230 | 0.548 / 0.535 | 0.548 / 0.513 |
 | **0.75** | **2406** | **585** | **3** | **1171** | **389** | **0.543 / 0.567** | **0.568 / 0.592** |
 | 0.80 | 1825 | 758 | 2 | 444 | 535 | 0.578 / 0.569 | 0.588 / 0.591 |
@@ -1464,147 +1467,191 @@ retriever y repite el híbrido con λ de 0 a 1 en pasos de 0.1:
 
 `uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --out reports/phase3_eval.json`
 
-**Qué pasó.** Métricas sobre las preguntas resueltas (48 en recursivo, 47 en semántico):
+**Qué pasó.** Todas las métricas son sobre las preguntas resueltas, las que tienen algún chunk
+que contiene su evidencia: 48 en recursivo y 47 en semántico. Barrido de λ del híbrido (peso de BM25; λ = 0 es el denso solo y λ = 1 es BM25
+solo), con el mejor λ de cada chunking en negrita:
 
-| Chunking | Chunks | Media | Sin resolver | BM25 R@5 / MRR | Dense R@5 / MRR | Hybrid λ=0.5 R@5 / MRR | Mejor λ | Hybrid mejor λ R@5 / MRR |
+| λ | 0.0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Recursivo Recall@5 | 0.642 | 0.642 | 0.642 | 0.642 | **0.642** | 0.611 | 0.569 | 0.503 | 0.465 | 0.444 | 0.424 |
+| Recursivo MRR | 0.568 | 0.577 | 0.593 | 0.612 | **0.632** | 0.616 | 0.502 | 0.481 | 0.445 | 0.413 | 0.394 |
+| Semántico Recall@5 | 0.578 | 0.578 | 0.578 | **0.583** | 0.583 | 0.605 | 0.594 | 0.514 | 0.486 | 0.454 | 0.475 |
+| Semántico MRR | 0.603 | 0.616 | 0.627 | **0.647** | 0.637 | 0.630 | 0.539 | 0.497 | 0.447 | 0.425 | 0.417 |
+
+Resultados de cada retriever, con el híbrido en λ = 0.5 y en el mejor λ:
+
+| Chunking | Chunks | Media | Sin resolver | BM25 Recall@5 / MRR | Dense Recall@5 / MRR | Hybrid λ=0.5 Recall@5 / MRR | Mejor λ | Hybrid mejor λ Recall@5 / MRR |
 |---|---|---|---|---|---|---|---|---|
 | Recursivo | 2626 | 556 | 2 (14, 44) | 0.424 / 0.394 | 0.642 / 0.568 | 0.611 / 0.616 | 0.4 | **0.642 / 0.632** |
 | Semántico 0.75 | 2406 | 585 | 3 (5, 7, 10) | 0.475 / 0.417 | 0.578 / 0.603 | 0.605 / 0.630 | 0.3 | 0.583 / **0.647** |
 
-Barrido de λ (peso de BM25; λ = 0 es el denso solo y λ = 1 es BM25 solo):
+En el barrido de λ se ven tres cosas:
 
-| λ | 0.0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Recursivo R@5 | 0.642 | 0.642 | 0.642 | 0.642 | 0.642 | 0.611 | 0.569 | 0.503 | 0.465 | 0.444 | 0.424 |
-| Recursivo MRR | 0.568 | 0.577 | 0.593 | 0.612 | **0.632** | 0.616 | 0.502 | 0.481 | 0.445 | 0.413 | 0.394 |
-| Semántico R@5 | 0.578 | 0.578 | 0.578 | 0.583 | 0.583 | 0.605 | 0.594 | 0.514 | 0.486 | 0.454 | 0.475 |
-| Semántico MRR | 0.603 | 0.616 | 0.627 | **0.647** | 0.637 | 0.630 | 0.539 | 0.497 | 0.447 | 0.425 | 0.417 |
+- Entre λ = 0 y el mejor λ el Recall@5 apenas cambia (0.642 en recursivo, 0.578–0.583 en
+  semántico), pero el MRR sube de 0.568 a 0.632 en recursivo (λ = 0.4) y de 0.603 a 0.647 en
+  semántico (λ = 0.3). Es decir, añadir un poco de BM25 no mete chunks relevantes nuevos en el
+  top 5, sino que sube de posición los que el denso ya encontraba.
+- A partir de λ = 0.6 las dos métricas caen rápido (en recursivo, el MRR baja a 0.502 con
+  λ = 0.6): el ranking pasa a estar dominado por BM25.
+- BM25 solo (λ = 1) es la peor configuración en los dos chunkings: coincide con la columna de
+  BM25 de la segunda tabla.
 
-Tres cosas se ven en esta tabla:
+Las preguntas sin resolver no se pueden puntuar porque ningún chunk contiene entero ninguno de
+sus fragmentos de evidencia. La salida de `rag/evaluate.py` las lista con la longitud de cada
+fragmento:
 
-- Entre λ = 0 y λ = 0.4 el Recall@5 no cambia (0.642 en recursivo, 0.578–0.583 en semántico),
-  pero el MRR sube de 0.568 a 0.632 y de 0.603 a 0.647. Es decir, añadir un poco de BM25 no mete
-  chunks relevantes nuevos en el top 5, sino que sube de posición los que el denso ya encontraba.
-- A partir de λ = 0.6 las dos métricas caen rápido: el ranking pasa a estar dominado por BM25.
-- BM25 solo (λ = 1) es la peor configuración en los dos chunkings (Recall@5 0.424 y 0.475).
+| Chunking | Pregunta | Fragmentos de evidencia (caracteres) |
+|---|---|---|
+| Recursivo | 14 (tendinitis con levofloxacino) | 685 |
+| Recursivo | 44 (sobredosis de morfina) | 683 y 161 |
+| Semántico | 5 (contenido del vial de ceftriaxona) | 421 |
+| Semántico | 7 (reconstitución de la amoxicilina) | 389 |
+| Semántico | 10 (envases de enoxaparina) | 707 y 276 |
 
-Las preguntas sin resolver no se pueden puntuar porque ningún chunk contiene su evidencia
-entera. En recursivo son la 14 y la 44: sus evidencias (685 y 683 caracteres) caben en el
-tamaño máximo, pero el divisor corta dentro de ellas y quedan repartidas en dos chunks. En
-semántico son la 5, la 7 y la 10: un corte (semántico o por tamaño) cae en mitad de la evidencia.
+Todos los fragmentos caben en el tamaño máximo de su chunking (800 y 1500 caracteres), así que
+no quedan sin resolver por ser largos: un corte cae en mitad de la evidencia y la reparte entre
+dos chunks. En recursivo es el divisor, que corta donde se le acaba el espacio. En semántico es
+un corte semántico o por tamaño.
 
-**Qué concluimos.** El denso gana a BM25 con diferencia. Creemos que se debe a que 13 de las 50
-preguntas del gold son coloquiales o inversas (de síntoma a fármaco) y no comparten palabras con
-la ficha; falta comprobarlo con las métricas por categoría. BM25 sirve como complemento con un
+**Qué concluimos.** El denso gana a BM25 con diferencia. Creemos que se debe a las preguntas
+coloquiales e inversas (de síntoma a fármaco) del gold (ver la entrada del conjunto dorado), que
+no comparten palabras con la ficha. BM25 sirve como complemento con un
 peso pequeño: nuestra hipótesis es que sube el chunk bueno por coincidencia exacta con el nombre
 del fármaco o con cifras, en fichas de la misma familia que el denso confunde (cefalosporinas,
 carbapenems) aunque no lo hemos verificado pregunta a pregunta. Los dos chunkings quedan prácticamente
 empatados en MRR. Sin embargo, el recursivo tiene mejor recall y una pregunta menos sin resolver, así que
 **`/rag` usa chunking recursivo e híbrido con λ = 0.4**. Elegimos λ por MRR porque el endpoint
-devuelve pocos fragmentos y lo que importa es que el bueno salga primero. Queda pendiente analizar
-las preguntas que fallan (`failures` en `reports/phase3_eval.json`) por categoría del gold, y
-probar otras instrucciones de embedding.
+devuelve pocos fragmentos y lo que importa es que el bueno salga primero. El análisis de las preguntas que
+fallan, por categoría del gold, está en la entrada siguiente. Queda pendiente probar otras
+instrucciones de embedding.
+
+---
+
+### 2026-10-30 · Fase 3 · Preguntas que fallan, por categoría del gold
+
+**Qué queríamos saber.** En qué tipos de pregunta falla la recuperación y si se cumple la
+hipótesis de la entrada anterior (que el denso gana por las preguntas coloquiales e inversas).
+
+**Qué hicimos.** Añadimos a `rag/evaluate.py` las métricas por categoría del gold y la lista de
+preguntas que fallan con el híbrido (con la ficha de la evidencia y la de cada fragmento
+recuperado). Las categorías se asignan por el número de pregunta, en el orden del gold. Mismo
+comando que en la entrada anterior.
+
+**Qué pasó.** Híbrido con chunking recursivo y λ = 0.4 (Recall@5 / MRR y número de fallos):
+
+| Categoría | Preguntas | Recall@5 / MRR | Fallos |
+|---|---|---|---|
+| Un medicamento, una sección | 15 | 0.571 / 0.524 | 6 |
+| Un medicamento, varias secciones | 8 | 0.521 / 0.812 | 1 |
+| Varios medicamentos | 8 | 0.583 / 0.463 | 2 |
+| Inversas | 8 | 1.000 / 1.000 | 0 |
+| Lenguaje coloquial | 5 | 0.250 / 0.250 | 3 |
+| Premisa dudosa | 3 | 0.667 / 0.700 | 1 |
+| Cálculo | 3 | 1.000 / 0.567 | 0 |
+
+En los 13 fallos, la ficha correcta está entre los cinco fragmentos recuperados: lo que falla
+es la sección, no el fármaco.
+
+**Qué concluimos.** Las inversas, que nos preocupaban, salen perfectas. Las peores son las
+coloquiales: "¿cuánto me dura la vancomicina ya preparada?" lleva a la ficha de la vancomicina,
+pero no a la sección de periodo de validez. La hipótesis se cumple solo en parte, porque en
+recursivo el denso gana a BM25 en todas las categorías, no solo en esas dos. También vimos que
+las preguntas 6 y 41 tienen evidencias tan genéricas que aparecen en varias fichas (3 y 7), y
+habría que alargarlas. Con tan pocas preguntas por categoría, estos resultados son orientativos.
 
 ---
 
 ### 2026-10-29 · Fase 3 · Generación con citas: primera prueba de `/rag`
 
-**Qué queríamos saber.** Si `POST /rag` funciona de principio a fin: recupera, cita fragmentos
-que existen y dice que no sabe cuando el corpus no tiene la respuesta.
+**Qué queríamos saber.** Si `POST /rag` funciona de principio a fin con nuestro modelo de
+razonamiento de la fase 1 como generador: si recupera, si cita fragmentos que existen y si dice
+que no sabe cuando el corpus no tiene la respuesta.
 
-**Qué hicimos.** Completamos el pipeline de `rag/generate.py`, que es lo que hay detrás de
-`POST /rag`. Al arrancar lee el corpus, lo trocea con chunking recursivo, construye los tres
-retrievers (híbrido con λ = 0.4, según el barrido de la entrada anterior) y carga el modelo
-generador. El índice denso se guarda en `rag/index/` para no reembeber el corpus en cada arranque.
-Para cada pregunta recupera los `top_k` mejores fragmentos y los mete en el prompt aumentado con
-su identificador. Después genera la respuesta y extrae las citas, quedándose solo con las que
-existen entre los fragmentos devueltos. Como generador usamos Qwen3-4B base, sin razonamiento y
-con decodificación voraz.
+**Qué hicimos.** `rag/generate.py` es lo que hay detrás de `POST /rag`. Al arrancar lee el corpus,
+lo trocea con chunking recursivo, construye los tres retrievers (híbrido con λ = 0.4, según el
+barrido de la entrada anterior) y carga el generador. El índice denso se guarda en `rag/index/`
+para no reembeber el corpus en cada arranque. Para cada pregunta recupera los `top_k` mejores
+fragmentos y los mete en el prompt aumentado con su identificador. Después genera la respuesta y
+extrae las citas, quedándose solo con las que existen entre los fragmentos devueltos.
 
-Levantamos la API (`make api`, o `uv run uvicorn api.app:app --port 8001`) y comprobamos con
-`curl localhost:8001/health` que la fase `rag` aparece como `ready`. Hicimos tres peticiones, una con cada retriever:
+El generador se toma de las mismas variables que `/reasoning`, `ARCA_RLM_BASE_MODEL` y
+`ARCA_RLM_ADAPTER` del `.env`: nuestro modelo de la fase 1, Qwen3-0.6B con el adaptador LoRA
+`rlm/weights/final_rlm_lora_sin_kl`. Como se entrenó con el prompt de sistema de R1-Zero, el
+prompt aumentado se mete en ese prompt de sistema; el modelo razona en `<think>` y la respuesta
+es el bloque `<answer>`, igual que en `/reasoning`. La decodificación es voraz.
 
-1. Una pregunta del gold, con el híbrido:
+Levantamos la API desde la raíz del repositorio (`make api`, o
+`uv run uvicorn api.app:app --port 8001`) y comprobamos con `curl localhost:8001/health` que la
+fase `rag` aparece como `ready`. Hicimos tres
+peticiones, una con cada retriever.
+
+**Qué pasó.**
+
+**Caso 1.** Una pregunta del gold, con el híbrido:
 
 ```bash
 curl -s -X POST localhost:8001/rag -H 'Content-Type: application/json' \
   -d '{"question": "¿Cómo debe ajustarse la dosis de cefotaxima en pacientes con insuficiencia renal grave?", "top_k": 5, "retriever": "hybrid"}'
 ```
-```bash
-{"answer":"La dosis de cefotaxima debe ajustarse según el cálculo del aclaramiento de creatinina, como se menciona en la sección 4.2 del documento [7f4d67e570-0026]. En pacientes con insuficiencia renal grave, es necesario realizar un ajuste de dosis para compensar la excreción más lenta del medicamento. Además, se debe tener precaución al administrar cefotaxima junto con aminoglucósidos u otros productos nefrotóxicos, ya que existe un riesgo aumentado de daño renal. La función renal debe monitorearse en estos pacientes, así como en aquellos de edad avanzada y con insuficiencia renal previa. También se menciona que se debe respetar la velocidad de inyección recomendada para evitar arritmias cardíacas potencialmente mortales.","chunks":[{"id":"398bb4b1b8-0017","source":"ceftriaxona_62635.md","score":0.9100030017369802,"text":"4.2 Posología y forma de administración\nPacientes con insuficiencia renal\n\nEn pacientes con insuficiencia renal no es necesario reducir la dosis de ceftriaxona si la función hepática no está alterada. Solo en la insuficiencia renal preterminal (aclaramiento de creatinina < 10 ml/min) no se debe sobrepasar la dosis de 2 g de ceftriaxona diarios.\n\nEn pacientes dializados no es necesaria ninguna dosis suplementaria adicional tras la diálisis. Ni la hemodiálisis ni la diálisis peritoneal eliminan la ceftriaxona. Se recomienda una estrecha vigilancia clínica de la seguridad y la eficacia.\n\nPacientes con insuficiencia hepática y renal grave\n\nEn pacientes con insuficiencia grave de las funciones renal y hepática se recomienda una estrecha vigilancia clínica de la seguridad y la eficacia."},{"id":"7f4d67e570-0026","source":"cefotaxima_57720.md","score":0.8401343465092997,"text":"4.4 Advertencias y precauciones especiales de empleo\nPacientes con insuficiencia renal\n\nLa dosis se debe ajustar según el cálculo del aclaramiento de creatinina (ver sección 4.2). Debe tenerse precaución a la hora de administrar cefotaxima junto con aminoglucósidos u otros productos nefrotóxicos (ver sección 4.5).\n\nLa función renal se debe monitorizar en estos pacientes, en los pacientes de edad avanzada y en aquellos con insuficiencia renal previa.\n\nPrecauciones de administración\n\nSe ha descrito que algunos pacientes han experimentado arritmias cardíacas potencialmente mortales después de la inyección rápida de cefotaxima a través de un catéter venoso central (CVC). Por lo tanto, se debe respetar la velocidad de inyección recomendada (ver sección 4.2).\n\nVigilancia"},{"id":"910ed8f16d-0011","source":"ceftazidima_67007.md","score":0.4875704311687796,"text":"4.2 Posología y forma de administración\nInsuficiencia renal\n\nCeftazidima se excreta inalterada por vía renal. Por tanto, se debe reducir la dosis en pacientes con insuficiencia renal (ver la sección 4.4).\n\nSe debe administrar una dosis de carga inicial de 1 g. Las dosis de mantenimiento se deben basar en el aclaramiento de creatinina:\n\nTabla 3: Dosis de mantenimiento recomendadas de ceftazidima en insuficiencia renal – administración intermitente\n\nAdultos y niños ≥40 kg\n\nAclaramiento de\n\ncreatinina\n\n(ml/min)\n\nCreatinina sérica\n\naprox.\n\nμmol/l (mg/dl)\n\nDosis unitaria\n\nrecomendada de\n\nceftazidima (g)\n\nFrecuencia de dosis\n\n(horas)\n\n50-31\n\n150-200\n\n(1,7-2,3)\n\n1\n\n12\n\n30-16\n\n200-350\n\n(2,3-4,0)\n\n1\n\n24\n\n15-6\n\n350-500\n\n(4,0-5,6)\n\n0,5\n\n24\n\n<5\n\n>500\n\n(>5,6)\n\n0,5\n\n48"},{"id":"8a0b991483-0007","source":"cefuroxima_62907.md","score":0.44599108883181465,"text":"4.2.1 Posología\n30 a 100 mg/kg/día (por vía intravenosa) administrada en 2 ó 3 dosis divididas (ver sección 5.2)\n\nInfecciones complicadas del tracto urinario, incluyendo pielonefritis\n\nInfecciones de tejidos blandos; celulitis, erisipela y heridas infectadas\n\nInfecciones intra-abdominales\n\nInsuficiencia renal\n\nCefuroxima se excreta principalmente vía renal. Por lo tanto, al igual que con todos los antibióticos, en pacientes con función renal notablemente deteriorada se recomienda reducir la dosis de este medicamento para compensar su excreción más lenta.\n\nTabla 3. Dosis recomendada de cefuroxima en pacientes con insuficiencia renal\n\nAclaramiento de la creatinina\n\nT1/2 (hrs)\n\nDosis (mg)\n\n> 20 ml/min/1,73 m2\n\n1,7-2,6"},{"id":"8c60a20425-0006","source":"cefazolina_53914.md","score":0.4399137612906581,"text":"4.2 Posología y forma de administración\n1 g a 1,5 g\n\ncada 6 horas\n\n* En raras ocasiones se han utilizado dosis de hasta 12 g de cefazolina diarios.\n\nPacientes adultos con insuficiencia renal: la cefazolina no se excreta completamente. Después de administrar la dosis adecuada según la severidad de la infección, se deben seguir las siguientes recomendaciones. La tabla siguiente (tabla 2) puede usarse como guía:\n\nTabla 2 Dosis en adultos con la función renal disminuida\n\nAclaramiento de creatinina\n\n(ml/min)\n\nCreatinina sérica\n\n(mg%)\n\nDosis\n\n>55\n\n<1,5\n\nEstándar\n\n35-54\n\n1,6 a 3,0\n\nEstándar cada 8 horas\n\n11-34\n\n3,1-4,5\n\n50% de la dosis estándar cada 12 horas\n\n<10\n\n>4,6\n\n50% de la dosis estándar cada 18-24 horas"}],"citations":["7f4d67e570-0026"],"retriever":"hybrid","model":"Qwen/Qwen3-4B"}
-```
 
-2. Una pregunta coloquial, con el denso:
+Fragmentos recuperados: ceftriaxona 4.2 (0.91), cefotaxima 4.4 (0.84, `7f4d67e570-0026`),
+ceftazidima 4.2 (0.49, `910ed8f16d-0011`), cefuroxima 4.2.1 (0.45) y cefazolina 4.2 (0.44).
+Citas: ninguna. Respuesta:
+
+> La dosis de cefotaxima debe ajustarse según el cálculo del aclaramiento de creatinina, que se
+> basa en el valor de la creatinina sérica. La dosis de carga inicial es de 1 g y las dosis de
+> mantenimiento se basan en el aclaramiento de creatinina. La vigilancia clínica de la seguridad
+> y la eficacia debe incluir la monitorización de la función renal.
+
+El único fragmento de cefotaxima es el de la sección 4.4, no el de la 4.2 que tiene la respuesta
+(`7f4d67e570-0011`), así que no da la regla concreta de la ficha (reducir a la mitad la dosis de
+mantenimiento si el aclaramiento es < 10 ml/min). Además, "la dosis de carga inicial es de 1 g"
+es la dosis de la **ceftazidima** (`910ed8f16d-0011`), atribuida a la cefotaxima.
+
+**Caso 2.** Una pregunta coloquial, con el denso:
 
 ```bash
-curl -s -X POST localhost:8001/rag -H 'Content-Type: application/json' \
+curl -s -X POST localhost:8000/rag -H 'Content-Type: application/json' \
   -d '{"question": "¿Se puede dar meropenem con probenecid?", "top_k": 5, "retriever": "dense"}'
 ```
+
+Fragmentos recuperados: meropenem 4.5 (0.86, `de9b07db3c-0021`), meropenem 4.4 (0.76),
+amoxicilina 4.5 (0.71), meropenem 4.4 (0.68) y meropenem 4.4 (0.68). Citas: ninguna. Respuesta:
+
+> Se puede administrar meropenem con probenecid, pero se debe considerar la inhibición de la 
+> excreción renal de meropenem por probenecid. La combinación puede afectar la dosis y la 
+> eficacia, por lo que se recomienda consultar a un médico antes de administrar ambas medicamentos.
+
+El primer fragmento tiene la respuesta: el probenecid inhibe la excreción renal del meropenem y
+"se requiere precaución". El modelo recoge la interacción, pero la conclusión ("ajustar la dosis
+de probenecid") no está en ningún fragmento.
+
+**Caso 3.** Una pregunta que el corpus no puede responder (el omeprazol no está en el corpus),
+con BM25:
+
 ```bash
-
-```
-
-3. Una pregunta que el corpus no puede responder (el omeprazol no está en el corpus), con BM25:
-
-```bash
-curl -s -X POST localhost:8001/rag -H 'Content-Type: application/json' \
+curl -s -X POST localhost:8000/rag -H 'Content-Type: application/json' \
   -d '{"question": "¿Cuál es la dosis de omeprazol intravenoso en una hemorragia digestiva?", "top_k": 5, "retriever": "bm25"}'
 ```
 
-Cada respuesta trae `answer`, los fragmentos recuperados (`chunks`, con id, fichero, puntuación y
-texto), las citas válidas (`citations`), el `retriever` y el `model`.
+Fragmentos recuperados: enoxaparina 4.4 (17.9), heparina 4.9 (17.0), furosemida 4.2 (16.9),
+furosemida 4.2 (16.3) y azitromicina 4.2.2 (15.9). Citas: ninguna. Respuesta:
 
-**Qué pasó.**
+> La información proporcionada no incluye datos sobre la dosis de omeprazol intravenosa en casos
+> de hemorragia digestiva. No hay referencias o datos sobre este medicamento en la información disponible.
 
-| Caso | Retriever | Fragmentos recuperados (fichero, puntuación) | Citas |
-|---|---|---|---|
-| 1. Cefotaxima | hybrid | ceftriaxona 4.2 (0.91), **cefotaxima 4.4** (0.84), ceftazidima 4.2 (0.49), cefuroxima 4.2.1 (0.45), cefazolina 4.2 (0.44) | `7f4d67e570-0026` |
-| 2. Meropenem | dense | meropenem 4.5 (0.86), meropenem 4.4 (0.76), amoxicilina 4.5 (0.71), meropenem 4.4 (0.68), meropenem 4.4 (0.68) | `de9b07db3c-0021` |
-| 3. Omeprazol | bm25 | enoxaparina 4.4 (17.9), heparina 4.9 (17.0), furosemida 4.2 (16.9), furosemida 4.2 (16.3), azitromicina 4.2.2 (15.9) | ninguna |
+BM25 empareja palabras como "dosis", "intravenoso" o "hemorragia" y trae fragmentos sin relación,
+pero el modelo reconoce que no tiene la información. Es el comportamiento esperado.
 
-- **Caso 1.** El único fragmento de cefotaxima es el de la sección 4.4 (`7f4d67e570-0026`), no el
-  de la 4.2 que tiene la respuesta (`7f4d67e570-0011`), así que es un fallo de recuperación. La
-  respuesta:
-
-  > La dosis de cefotaxima debe ajustarse según el cálculo del aclaramiento de creatinina
-  > [7f4d67e570-0026]. En pacientes con insuficiencia renal grave, se debe reducir la dosis de
-  > cefotaxima para compensar su excreción más lenta, al igual que con todos los antibióticos.
-  > Además, se debe monitorizar la función renal en estos pacientes, en los pacientes de edad
-  > avanzada y en aquellos con insuficiencia renal previa.
-
-  No da la regla concreta de la ficha (reducir a la mitad la dosis de mantenimiento si el
-  aclaramiento es < 10 ml/min), y la segunda frase ("al igual que con todos los antibióticos")
-  no está en ninguno de los fragmentos recuperados ni lleva cita: es una alucinación. Al probar
-  la misma pregunta llamando a `answer_with_rag` desde un script, con los mismos cinco
-  fragmentos, la redacción salió distinta: aun con decodificación voraz, la generación no es
-  exactamente reproducible en GPU.
-- **Caso 2.** La respuesta es correcta y está citada:
-
-  > Sí, se puede dar meropenem con probenecid, pero se requiere precaución. Probenecid compite
-  > con meropenem en la secreción tubular activa y, por tanto, inhibe su excreción renal, lo que
-  > conlleva a un aumento de la vida media de eliminación y concentración plasmática del
-  > meropenem. Sin embargo, no se recomienda el uso concomitante de probenecid con amoxicilina,
-  > ya que este puede producir un aumento y prolongación de los niveles plasmáticos de
-  > amoxicilina. [de9b07db3c-0021]
-
-  La última frase viene del fragmento de amoxicilina (`03e2eb562d-0027`), que no se cita, y queda
-  cubierta por la cita de meropenem. La comprobación automática solo verifica que el id citado
-  existe entre los fragmentos devueltos, no que respalde cada frase.
-- **Caso 3.** Recupera fragmentos sin relación (BM25 empareja palabras como "dosis",
-  "intravenoso" o "hemorragia") y el modelo dice que no tiene la información, sin citar nada:
-
-  > La información proporcionada no incluye datos sobre la dosis de omeprazol intravenoso en una
-  > hemorragia digestiva. [...] Por lo tanto, no se puede responder a la pregunta con los datos
-  > disponibles.
-
-  Es el comportamiento esperado.
-
-**Qué concluimos.** El endpoint funciona con los tres retrievers, y las citas que devuelve
-existen siempre entre los fragmentos recuperados. Los problemas vistos son de tres tipos: de
-recuperación (el chunk correcto no entra en el top 5, caso 1), de alucinación (una frase sin
-respaldo y sin cita, caso 1) y de atribución (una cita que cubre una frase que no respalda,
-caso 2). Siguiente paso: pasar todo el gold por `/rag` y medir cuántas respuestas citan algún
-chunk relevante, y valorar un juez de fidelidad que compruebe cada frase contra el fragmento
-citado.
+**Qué concluimos.** La API funciona con los tres retrievers, y la recuperación y el prompt
+aumentado son los esperados. Con nuestro modelo como generador, en cambio, las respuestas no
+cumplen lo que se pide en `/rag`. No cita ningún fragmento, aunque el prompt lo pide. Mezcla
+datos de fármacos distintos (la dosis de la ceftazidima) y añade conclusiones que no están en
+los fragmentos (ajustar la dosis de probenecid). Lo único que hace bien es reconocer que el
+omeprazol no está. Creemos que se debe al modelo y no al pipeline. El adaptador se entrenó para
+calcular dosis a partir de un enunciado corto y responder con un número en `<answer>`, no para
+leer varios fragmentos largos y citar su origen, y un modelo de 0.6B tiene poca capacidad para
+separar cinco fichas parecidas en el mismo contexto. Habría que entrenar al modelo para que 
+aprendiera a citar.
 
 ---

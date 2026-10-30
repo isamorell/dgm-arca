@@ -25,8 +25,8 @@ CHUNKING = os.getenv("ARCA_RAG_CHUNKING", "recursive")  # "recursive" | "semanti
 SEMANTIC_THRESHOLD = 0.75  # chosen with the sweep in rag/evaluate.py (see EXPERIMENTS.md)
 CORPUS_DIR = Path("rag/corpus")
 INDEX_DIR = Path("rag/index")
-GENERATOR_MODEL = os.getenv("ARCA_RAG_MODEL", "Qwen/Qwen3-4B")
-GENERATOR_ADAPTER = os.getenv("ARCA_RAG_ADAPTER") or None
+GENERATOR_MODEL = os.getenv("ARCA_RLM_BASE_MODEL", "Qwen/Qwen3-4B")
+GENERATOR_ADAPTER = os.getenv("ARCA_RLM_ADAPTER") or None
 LAMBDA_BM25 = 0.4  # best MRR in the λ sweep with recursive chunking (EXPERIMENTS.md)
 MAX_NEW_TOKENS = 1024
 
@@ -133,21 +133,37 @@ class RagPipeline:
         return self.retrievers[retriever].search(question, top_k=top_k)
 
     def _generate(self, prompt: str) -> str:
-        """Helper: apply the chat template, decode greedily, drop any <think> block."""
+        """Helper: apply the chat template, decode greedily, drop any <think> block.
+
+        With an adapter (our phase-1 RLM) the prompt goes inside the R1-Zero system prompt it
+        was trained with, the model thinks first and the answer is the ``<answer>`` block, as
+        in ``POST /reasoning``. The base model gets the prompt alone, without thinking.
+        """
         import torch
 
-        text = self.tokenizer.apply_chat_template(
-            [{"role": "user", "content": prompt}],
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False,
-        )
+        if GENERATOR_ADAPTER:
+            from rlm.data import build_prompt as r1_messages
+
+            text = self.tokenizer.apply_chat_template(
+                r1_messages(prompt), tokenize=False, add_generation_prompt=True
+            )
+        else:
+            text = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": prompt}],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
         with torch.no_grad():
             out = self.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS, do_sample=False)
         answer = self.tokenizer.decode(
             out[0, inputs["input_ids"].shape[1] :], skip_special_tokens=True
         )
+        if GENERATOR_ADAPTER:
+            from rlm.inference import split_thinking
+
+            return split_thinking(answer)[1]
         return re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
 
     def answer(self, question: str, top_k: int = 5, retriever: str = "hybrid") -> RagResponse:
