@@ -1398,14 +1398,18 @@ compararlo con el chunking recursivo y fijarlo en `rag/generate.py`.
 todo el corpus y la gráfica de un documento (ceftriaxona), con el barrido que propone el
 docstring de `rag/chunking.py` (0.15 a 0.4, con 0.25 por defecto). Sin embargo, 0.25 de threshold era demasiado bajo y troceaba practicamente por frases. Por lo tanto, probamos con un threshold más alto con el siguiente comando:
 
-`uv run python -m rag.chunking --doc ceftriaxona --sweep 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 --threshold 0.75 --out reports/rag/chunking_distances.png`
+```bash
+uv run python -m rag.chunking --doc ceftriaxona --sweep 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 --threshold 0.75 --out reports/rag/chunking_distances.png
+```
 
 Después medimos la recuperación con cada umbral sobre el conjunto dorado: para cada umbral se
 trocea el corpus, se construyen los tres retrievers (λ = 0.5 en el híbrido) y se calculan
 Recall@5 y MRR sobre las 50 preguntas. Una pregunta cuya evidencia no cabe entera en ningún
 chunk cuenta como fallo. Embeddings con Qwen3-Embedding-0.6B y `max_chunk_chars=1500`:
 
-`uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --thresholds 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 --out reports/phase3_threshold_sweep.json`
+```bash
+uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --thresholds 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 --out reports/phase3_threshold_sweep.json
+```
 
 El mismo comando cuenta también por qué se cierra cada chunk: por superar el umbral (corte
 semántico), por superar los 1500 caracteres (corte por tamaño) o por empezar una sección nueva
@@ -1465,7 +1469,9 @@ cambian con la estrategia, los fragmentos relevantes de cada pregunta se calcula
 evidencia del gold dentro del texto de los chunks. Con eso calcula Recall@5 y MRR de cada
 retriever y repite el híbrido con λ de 0 a 1 en pasos de 0.1:
 
-`uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --out reports/phase3_eval.json`
+```bash
+uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --out reports/phase3_eval.json
+```
 
 **Qué pasó.** Todas las métricas son sobre las preguntas resueltas, las que tienen algún chunk
 que contiene su evidencia: 48 en recursivo y 47 en semántico. Barrido de λ del híbrido (peso de BM25; λ = 0 es el denso solo y λ = 1 es BM25
@@ -1580,10 +1586,17 @@ El generador se toma de las mismas variables que `/reasoning`, `ARCA_RLM_BASE_MO
 prompt aumentado se mete en ese prompt de sistema; el modelo razona en `<think>` y la respuesta
 es el bloque `<answer>`, igual que en `/reasoning`. La decodificación es voraz.
 
-Levantamos la API desde la raíz del repositorio (`make api`, o
-`uv run uvicorn api.app:app --port 8001`) y comprobamos con `curl localhost:8001/health` que la
-fase `rag` aparece como `ready`. Hicimos tres
-peticiones, una con cada retriever.
+Levantamos la API desde la raíz del repositorio y comprobamos que la fase `rag` aparece como
+`ready`:
+
+```bash
+uv run uvicorn api.app:app --port 8001   # o make api, que usa el puerto 8000
+curl localhost:8001/health
+```
+
+Hicimos tres peticiones, una con cada retriever. Las peticiones 
+aparecen con curl pero también las hicimos exponiendo la api con ngrok usando Postman 
+confirmando que funciona.
 
 **Qué pasó.**
 
