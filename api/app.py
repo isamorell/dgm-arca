@@ -11,15 +11,25 @@ The grader calls these endpoints with the bodies defined in ``api/schemas.py``. 
 that is not implemented yet answers 501 with a clear message, so the API is always up
 and you can hand it in incrementally.
 """
-
 from __future__ import annotations
 
 import logging
 import time
+from contextlib import asynccontextmanager
+import os
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
+
+from dotenv import load_dotenv
+load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.environ.get("ARCA_PRELOAD", "1") == "1":
+        backends.status()
+    yield
 
 from api.backends import Backends, env
 from api.schemas import (
@@ -34,9 +44,6 @@ from api.schemas import (
     ToolsResponse,
 )
 
-from dotenv import load_dotenv
-load_dotenv()
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("arca.api")
 
@@ -47,6 +54,7 @@ app = FastAPI(
         "Un endpoint por fase: /reasoning, /tools, /rag y /agent."
     ),
     version="0.1.0",
+    lifespan=lifespan,
 )
 backends = Backends()
 

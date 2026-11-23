@@ -20,6 +20,7 @@ import logging
 import os
 from collections.abc import Callable
 from typing import Any
+import threading
 
 from api.schemas import PhaseStatus
 
@@ -34,22 +35,26 @@ class Backends:
     def __init__(self) -> None:
         self._cache: dict[str, Any] = {}
         self._errors: dict[str, str] = {}
+        self._locks = {p: threading.Lock() for p in PHASES}
 
     # -- loaders --------------------------------------------------------------
 
-    def _load(self, phase: str, factory: Callable[[], Any]) -> Any:
+    def _load(self, phase, factory):
         if phase in self._cache:
             return self._cache[phase]
-        try:
-            self._cache[phase] = factory()
-            self._errors.pop(phase, None)
-        except NotImplementedError as exc:
-            self._errors[phase] = str(exc) or f"Phase '{phase}' is not implemented yet."
-            raise
-        except Exception as exc:  # noqa: BLE001 - surface any loading problem to /health
-            self._errors[phase] = f"{type(exc).__name__}: {exc}"
-            log.exception("Failed to load phase %s", phase)
-            raise
+        with self._locks[phase]:
+            if phase in self._cache:
+                return self._cache[phase]
+            try:
+                self._cache[phase] = factory()
+                self._errors.pop(phase, None)
+            except NotImplementedError as exc:
+                self._errors[phase] = str(exc) or f"Phase '{phase}' is not implemented yet."
+                raise
+            except Exception as exc:  # noqa: BLE001
+                self._errors[phase] = f"{type(exc).__name__}: {exc}"
+                log.exception("Failed to load phase %s", phase)
+                raise
         return self._cache[phase]
 
     def reasoning(self):
