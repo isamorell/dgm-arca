@@ -41,7 +41,6 @@ MAX_REPEATED_CALLS = 3  # the same call (name + arguments) this many times stops
 
 ACTION_PATTERN = re.compile(r"Action:\s*`?(?P<name>[A-Za-z_]\w*)`?")
 
-_retriever = None
 
 def _action_line_fallback(raw: str, known_tools) -> ToolCall | None:
     """Read ``Action: tool_name`` (optionally followed by a JSON object) written without a
@@ -71,17 +70,14 @@ def _get_retriever():
     """Ingest -> chunk -> build_retrievers, one single time. Returns the chosen retriever."""
     global _retriever
     if _retriever is None:
+        from core.models import get_embedder
         from rag.chunking import recursive_chunks
-        from rag.embed import Embedder
         from rag.generate import CORPUS_DIR, INDEX_DIR
         from rag.ingest import load_corpus
 
         chunks = recursive_chunks(load_corpus(CORPUS_DIR)) # decided in EXPERIMENTS.md. Works better than semantic
         retrievers = build_retrievers(
-            chunks,
-            Embedder(),
-            persist_dir=INDEX_DIR / "recursive", # same index as rag/
-            weight_bm25=LAMBDA_BM25
+            chunks, get_embedder(), persist_dir=INDEX_DIR / "recursive", weight_bm25=LAMBDA_BM25
         )
         _retriever = retrievers[RETRIEVER]
 
@@ -164,30 +160,16 @@ class ReActAgent:
         if brain not in BRAINS:
             raise ValueError(f"brain must be one of {sorted(BRAINS)}, got {brain!r}")
         if brain not in self._models:
-            adapter = _resolve_adapter() if brain == "rlm" else None  # fail before loading anything
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from core.models import get_llm
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            dtype = torch.bfloat16 if device == "cuda" else torch.float32
-
+            adapter = _resolve_adapter() if brain == "rlm" else None
             model_id = BRAINS["thinking"]() if brain == "thinking" else BRAINS["base"]()
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
-            model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype).to(device)
-
             if adapter:
-                from peft import PeftConfig, PeftModel
-
+                from peft import PeftConfig
                 trained_on = PeftConfig.from_pretrained(adapter).base_model_name_or_path
                 if trained_on and trained_on != model_id:
-                    warnings.warn(
-                        f"adapter trained on {trained_on}, but the loaded model is {model_id}.",
-                        stacklevel=2,
-                    )
-                model = PeftModel.from_pretrained(model, adapter)
-
-            self._models[brain] = (tokenizer, model.eval())
-
+                    warnings.warn(f"adapter trained on {trained_on}, but the loaded model is {model_id}.", stacklevel=2)
+            self._models[brain] = get_llm(model_id, adapter)
         return self._models[brain]
 
     def system_prompt(self, max_steps: int) -> str:

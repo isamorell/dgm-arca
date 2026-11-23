@@ -18,6 +18,7 @@ import logging
 import os
 import re
 from pathlib import Path
+import threading
 
 from api.schemas import RagResponse, RetrievedChunk
 from rag.retriever import Hit
@@ -123,11 +124,9 @@ class RagPipeline:
         Persist the dense index under ``rag/index/`` so this is fast after the first run.
         The generator can be your phase-1 RLM or the base model; record which in ``model``.
         """
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from core.models import get_embedder, get_llm
 
         from rag.chunking import recursive_chunks, semantic_chunks
-        from rag.embed import Embedder
         from rag.ingest import load_corpus
         from rag.retriever import build_retrievers
 
@@ -136,7 +135,7 @@ class RagPipeline:
         documents = load_corpus(CORPUS_DIR)
         if not documents:
             raise FileNotFoundError(f"No documents in {CORPUS_DIR}: run rag/download_corpus.py")
-        embedder = Embedder()
+        embedder = get_embedder()
 
         if CHUNKING == "recursive":
             chunks = recursive_chunks(documents)
@@ -148,15 +147,7 @@ class RagPipeline:
             chunks, embedder, persist_dir=INDEX_DIR / CHUNKING, weight_bm25=LAMBDA_BM25
         )
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        dtype = torch.bfloat16 if device == "cuda" else torch.float32
-        self.tokenizer = AutoTokenizer.from_pretrained(GENERATOR_MODEL)
-        model = AutoModelForCausalLM.from_pretrained(GENERATOR_MODEL, dtype=dtype).to(device)
-        if GENERATOR_ADAPTER:
-            from peft import PeftModel
-
-            model = PeftModel.from_pretrained(model, GENERATOR_ADAPTER)
-        self.model = model.eval()
+        self.tokenizer, self.model = get_llm(GENERATOR_MODEL, GENERATOR_ADAPTER)
         self.model_id = GENERATOR_MODEL + (f" + {GENERATOR_ADAPTER}" if GENERATOR_ADAPTER else "")
 
     def retrieve(self, question: str, top_k: int, retriever: str) -> list[Hit]:
@@ -207,15 +198,17 @@ class RagPipeline:
         return to_response(answer, hits, retriever, model=self.model_id)
 
 
+_pipeline_lock = threading.Lock()
 _pipeline: RagPipeline | None = None
 
 
 def build_pipeline() -> RagPipeline:
     global _pipeline
-    if _pipeline is None:
-        pipeline = RagPipeline()
-        pipeline.load()
-        _pipeline = pipeline
+    with _pipeline_lock:
+        if _pipeline is None:
+            pipeline = RagPipeline()
+            pipeline.load()
+            _pipeline = pipeline
     return _pipeline
 
 

@@ -1,4 +1,6 @@
 """The API must start with every phase pending and answer 501 with a useful message."""
+import os
+os.environ["ARCA_PRELOAD"] = "0"
 
 from fastapi.testclient import TestClient
 
