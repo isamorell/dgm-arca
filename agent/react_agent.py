@@ -41,6 +41,7 @@ MAX_REPEATED_CALLS = 3  # the same call (name + arguments) this many times stops
 
 ACTION_PATTERN = re.compile(r"Action:\s*`?(?P<name>[A-Za-z_]\w*)`?")
 
+_retriever = None
 
 def _action_line_fallback(raw: str, known_tools) -> ToolCall | None:
     """Read ``Action: tool_name`` (optionally followed by a JSON object) written without a
