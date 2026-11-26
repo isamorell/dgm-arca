@@ -1,4 +1,25 @@
 \section{El problema y el usuario}
+% Qué hace el agente, para quién, y qué hace esa persona hoy sin él. Un ejemplo de principio a fin: la pregunta del usuario, la traza del agente, la respuesta.
 
-% Qu\'e hace el agente, para qui\'en, y qu\'e hace esa persona hoy sin \'el.
-% Un ejemplo de principio a fin: pregunta, traza del agente, respuesta.
+Los estudiantes de Enfermería deben resolver con rapidez y precisión cálculos de administración de medicación: velocidades de infusión, goteo, dosis por peso, diluciones y conversiones entre mg, mcg y g. Son una fuente frecuente de errores, y un fallo de cálculo o de unidades puede suponer administrar una dosis diez o cien veces superior a la correcta, con riesgo grave para el paciente.
+
+Hoy el estudiante practica con hojas de problemas que solo ofrecen el resultado final, o con la calculadora, y solo recibe una explicación de sus errores cuando dispone de un profesor. Por eso hemos desarrollado un agente que permite practicar de forma constante y con corrección inmediata: resuelve el problema, explica el razonamiento paso a paso y comprueba el cálculo del estudiante. Para ello se apoya en datos reales de medicamentos y en cálculo con unidades, en lugar de usar la aritmética del propio modelo, que no es fiable ni trazable.
+
+\subsection*{Ejemplo de principio a fin}
+\caja{Pregunta del usuario}{%
+  Tengo que administrar 500 mL en 4 horas. ¿A cuántos mL/h debo ajustar la bomba de infusión?}
+
+{\renewcommand{\cajapad}{5pt}\renewcommand{\cajapadv}{2pt}
+\caja[orange!10]{Traza del agente (cerebro \texttt{thinking})}{\small
+  \textbf{Step 1.} \textbf{Thought:} Okay, the user wants to know the infusion rate in mL/h for administering 500 mL over 4 hours. [\dots] So, I should use the dose\_calculator with the expression \textquotedbl 500 / 4\textquotedbl{} and decimals 0. [\dots]\\
+  \textbf{Action:} \texttt{dose\_calculator}\,\{\texttt{expression}: \texttt{\textquotedbl 500 / 4\textquotedbl}, \texttt{decimals}: \texttt{0}\}\\
+  \textbf{Observation:} \texttt{125.0}\\[4pt]
+  \textbf{Step 2.} \textbf{Thought:} \textless think\textgreater{} Thought: The calculation confirms the infusion rate is 125 mL/h. [\dots]\\
+  \textbf{Action:} \texttt{final\_answer}\,\{\texttt{answer}: \texttt{\textquotedbl La bomba debe ser ajustada a 125 mL/h.\textquotedbl}\}\\
+  \textbf{Observation:} \texttt{null}}}
+
+\caja[green!10]{Respuesta del agente}{%
+  La bomba debe ser ajustada a 125 mL/h.\\
+  \emph{(2 pasos, 4\,512 tokens.)}}
+
+La traza sin recortar y la respuesta completa de la API en JSON están en el anexo~\ref{anx:traza}.

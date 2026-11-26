@@ -8,3 +8,60 @@
 
 \section{EXPERIMENTS.md}
 % Contenido completo de EXPERIMENTS.md.
+
+\section{Traza completa del ejemplo}\label{anx:traza}
+Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seguida de la respuesta completa de \texttt{POST /agent} tal como la devuelve la API.
+
+\caja[orange!10]{Step 1}{\small
+  \textbf{Thought:} Okay, the user wants to know the infusion rate in mL/h for administering 500 mL over 4 hours. Let me think about how to approach this.
+
+  First, the question is straightforward: calculate the volume per hour. The formula is total volume divided by time. So, 500 mL divided by 4 hours. That should give 125 mL/h.
+
+  But wait, I need to make sure I'm using the right tool. The available tools include dose\_calculator, which is for calculating doses, but this seems like a simple division. The user isn't asking for a dose calculation but rather a rate. The convert\_units tool might not be necessary here since the units are already consistent (mL and hours).
+
+  The dose\_calculator requires an expression with arithmetic operations. The expression here would be 500 / 4. The decimals parameter is optional, but since it's a simple division, maybe set it to 0. However, the user might want the answer rounded to a reasonable number of decimal places. But since 500 divided by 4 is exactly 125, no rounding is needed.
+
+  So, I should use the dose\_calculator with the expression \textquotedbl 500 / 4\textquotedbl{} and decimals 0. Then, the result would be 125 mL/h. The final answer would be that number.
+
+  I should check if there's a need to use the search\_knowledge\_base, but since this is a basic calculation, probably not. The answer is direct.\\[4pt]
+  \textbf{Action:} \texttt{dose\_calculator}\,\{\texttt{expression}: \texttt{\textquotedbl 500 / 4\textquotedbl}, \texttt{decimals}: \texttt{0}\}\\
+  \textbf{Observation:} \texttt{125.0}}
+
+\caja[orange!10]{Step 2}{\small
+  \textbf{Thought:} \textless think\textgreater{} Thought: The calculation confirms the infusion rate is 125 mL/h. No further action is needed. Action:\\
+  \textbf{Action:} \texttt{final\_answer}\,\{\texttt{answer}: \texttt{\textquotedbl La bomba debe ser ajustada a 125 mL/h.\textquotedbl}\}\\
+  \textbf{Observation:} \texttt{null}}
+
+\subsection*{Respuesta JSON de la API}
+\begin{lstlisting}
+{
+    "final_answer": "La bomba debe ser ajustada a 125 mL/h.",
+    "steps": [
+        {
+            "thought": "Okay, the user wants to know the infusion rate in mL/h for administering 500 mL over 4 hours. Let me think about how to approach this.\n\nFirst, the question is straightforward: calculate the volume per hour. The formula is total volume divided by time. So, 500 mL divided by 4 hours. That should give 125 mL/h. \n\nBut wait, I need to make sure I'm using the right tool. The available tools include dose_calculator, which is for calculating doses, but this seems like a simple division. The user isn't asking for a dose calculation but rather a rate. The convert_units tool might not be necessary here since the units are already consistent (mL and hours). \n\nThe dose_calculator requires an expression with arithmetic operations. The expression here would be 500 / 4. The decimals parameter is optional, but since it's a simple division, maybe set it to 0. However, the user might want the answer rounded to a reasonable number of decimal places. But since 500 divided by 4 is exactly 125, no rounding is needed. \n\nSo, I should use the dose_calculator with the expression \"500 / 4\" and decimals 0. Then, the result would be 125 mL/h. The final answer would be that number. \n\nI should check if there's a need to use the search_knowledge_base, but since this is a basic calculation, probably not. The answer is direct.",
+            "action": {
+                "name": "dose_calculator",
+                "arguments": {
+                    "expression": "500 / 4",
+                    "decimals": 0
+                }
+            },
+            "observation": "125.0"
+        },
+        {
+            "thought": "<think>\nThought: The calculation confirms the infusion rate is 125 mL/h. No further action is needed.  \nAction:",
+            "action": {
+                "name": "final_answer",
+                "arguments": {
+                    "answer": "La bomba debe ser ajustada a 125 mL/h."
+                }
+            },
+            "observation": null
+        }
+    ],
+    "n_steps": 2,
+    "succeeded": true,
+    "model": "Qwen/Qwen3-1.7B",
+    "tokens_used": 4512
+}
+\end{lstlisting}

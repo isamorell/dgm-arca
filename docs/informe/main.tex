@@ -34,6 +34,7 @@
 % Otros
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage[skins,breakable]{tcolorbox}
 
 % Enlaces (hyperref casi siempre al final)
 \usepackage[
@@ -43,6 +44,17 @@
     citecolor=blue,
     urlcolor=blue
 ]{hyperref}
+
+% Recuadro para el ejemplo de principio a fin (título + contenido)
+\newcommand{\cajapad}{6pt}
+\newcommand{\cajapadv}{4pt}
+\newcommand{\caja}[3][gray!10]{%
+  \begin{tcolorbox}[colback=#1, colframe=gray, arc=3mm, boxrule=0.6pt,
+      left=\cajapad, right=\cajapad, top=\cajapadv, bottom=\cajapadv, title={#2},
+      coltitle=black, colbacktitle=#1, fonttitle=\bfseries, enhanced,
+      before skip=8pt, after skip=8pt]
+    #3
+  \end{tcolorbox}}
 
 % ====================== INFORMACIÓN DEL DOCUMENTO ===========================
 \newcommand{\Titulo}{
