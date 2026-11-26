@@ -17,19 +17,19 @@ Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seg
 
   First, the question is straightforward: calculate the volume per hour. The formula is total volume divided by time. So, 500 mL divided by 4 hours. That should give 125 mL/h.
 
-  But wait, I need to make sure I'm using the right tool. The available tools include dose\_calculator, which is for calculating doses, but this seems like a simple division. The user isn't asking for a dose calculation but rather a rate. The convert\_units tool might not be necessary here since the units are already consistent (mL and hours).
+  But wait, I need to make sure I'm using the right tool. The available tools include dose\_\allowbreak{}calculator, which is for calculating doses, but this seems like a simple division. The user isn't asking for a dose calculation but rather a rate. The convert\_\allowbreak{}units tool might not be necessary here since the units are already consistent (mL and hours).
 
-  The dose\_calculator requires an expression with arithmetic operations. The expression here would be 500 / 4. The decimals parameter is optional, but since it's a simple division, maybe set it to 0. However, the user might want the answer rounded to a reasonable number of decimal places. But since 500 divided by 4 is exactly 125, no rounding is needed.
+  The dose\_\allowbreak{}calculator requires an expression with arithmetic operations. The expression here would be 500 / 4. The decimals parameter is optional, but since it's a simple division, maybe set it to 0. However, the user might want the answer rounded to a reasonable number of decimal places. But since 500 divided by 4 is exactly 125, no rounding is needed.
 
-  So, I should use the dose\_calculator with the expression \textquotedbl 500 / 4\textquotedbl{} and decimals 0. Then, the result would be 125 mL/h. The final answer would be that number.
+  So, I should use the dose\_\allowbreak{}calculator with the expression \textquotedbl 500 / 4\textquotedbl{} and decimals 0. Then, the result would be 125 mL/h. The final answer would be that number.
 
-  I should check if there's a need to use the search\_knowledge\_base, but since this is a basic calculation, probably not. The answer is direct.\\[4pt]
-  \textbf{Action:} \texttt{dose\_calculator}\,\{\texttt{expression}: \texttt{\textquotedbl 500 / 4\textquotedbl}, \texttt{decimals}: \texttt{0}\}\\
+  I should check if there's a need to use the search\_\allowbreak{}knowledge\_\allowbreak{}base, but since this is a basic calculation, probably not. The answer is direct.\\[4pt]
+  \textbf{Action:} \texttt{dose\_\allowbreak{}calculator}\,\{\texttt{expression}: \texttt{\textquotedbl 500 / 4\textquotedbl}, \texttt{decimals}: \texttt{0}\}\\
   \textbf{Observation:} \texttt{125.0}}
 
 \caja[orange!10]{Step 2}{\small
   \textbf{Thought:} \textless think\textgreater{} Thought: The calculation confirms the infusion rate is 125 mL/h. No further action is needed. Action:\\
-  \textbf{Action:} \texttt{final\_answer}\,\{\texttt{answer}: \texttt{\textquotedbl La bomba debe ser ajustada a 125 mL/h.\textquotedbl}\}\\
+  \textbf{Action:} \texttt{final\_\allowbreak{}answer}\,\{\texttt{answer}: \texttt{\textquotedbl La bomba debe ser ajustada a 125 mL/h.\textquotedbl}\}\\
   \textbf{Observation:} \texttt{null}}
 
 \subsection*{Respuesta JSON de la API}

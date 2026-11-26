@@ -1,4 +1,60 @@
 \section{Arquitectura}
+% Un diagrama de las cuatro fases y cómo se conectan: qué modelo, qué herramientas, qué corpus, cómo entra cada cosa en el agente. Qué decisiones tomasteis y qué alternativas descartasteis.
 
-% Diagrama de las cuatro fases: modelo, herramientas, corpus y c\'omo entra cada cosa en el agente.
-% Decisiones tomadas y alternativas descartadas.
+La Figura~\ref{fig:arquitectura} resume la arquitectura. El agente (fase 4) es el centro: en cada paso le pide al cerebro (fase 1) qué hacer, ejecuta la herramienta elegida (fase 2) y la herramienta le devuelve el resultado como observación, hasta que llama a \texttt{final\_\allowbreak{}answer}. La base de conocimiento (fase 3) se usa como una herramienta más, \texttt{search\_\allowbreak{}knowledge\_\allowbreak{}base}, y permitimos que el cerebro sea intercambiable: \texttt{base}, \texttt{rlm} o \texttt{thinking} para poder realizar experimentos y comparativas entre ellos.
+
+\begin{figure}[!htbp]
+\centering
+\scalebox{0.9}{%
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners=4pt, align=center, font=\small,
+                inner sep=5pt, text width=3.8cm},
+    f1/.style={box, fill=purple!12},
+    f2/.style={box, fill=orange!15, text width=4.8cm},
+    f3/.style={box, fill=blue!10},
+    f4/.style={box, fill=green!14},
+    ext/.style={box, fill=gray!12, dashed, text width=5.6cm},
+    usr/.style={box, fill=white, text width=2.0cm},
+    flecha/.style={-{Stealth[length=2.5mm]}, thick},
+    dflecha/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, thick},
+    lbl/.style={font=\scriptsize, fill=white, inner sep=1.5pt}]
+
+  % Fila superior
+  \node[usr]  (usuario) at (0,0)    {Usuario};
+  \node[f4]   (agente)  at (4.9,0)  {\textbf{Agente ReAct}\\(Fase 4, sec.~\ref{sec:fase4})\\
+        bucle Thought--Action--Observation, memoria y \texttt{final\_\allowbreak{}answer}};
+  \node[f1]   (cerebro) at (11.8,0) {\textbf{Cerebro}\\(Fase 1, sec.~\ref{sec:fase1})\\
+        \texttt{base} (Qwen3-0.6B), \texttt{rlm} (SFT + GRPO) o \texttt{thinking} (Qwen3-1.7B)};
+
+  % Fila inferior
+  \node[f2]   (herr)  at (4.9,-3.7)  {\textbf{Herramientas}\\(Fase 2, sec.~\ref{sec:fase2})\\
+        registro y parser de \texttt{<tool\_\allowbreak{}call>}\\[2pt]
+        {\footnotesize \texttt{convert\_\allowbreak{}units}\\\texttt{dose\_\allowbreak{}calculator}\\
+        \texttt{create\_\allowbreak{}preparation\_\allowbreak{}sheet}\\\texttt{search\_\allowbreak{}medication\_\allowbreak{}cima}\\
+        \texttt{search\_\allowbreak{}knowledge\_\allowbreak{}base}}};
+  \node[f3]   (rag)   at (11.8,-3.7) {\textbf{Retriever}\\(Fase 3, sec.~\ref{sec:fase3})\\
+        denso, BM25 o híbrido};
+  \node[f3]   (corpus) at (11.8,-6.0) {\textbf{Corpus}\\fichas de medicamentos};
+  \node[ext]  (cima)  at (4.9,-6.9)  {API de CIMA (AEMPS), externa};
+
+  % Flechas
+  \draw[dflecha] (usuario) -- (agente) node[lbl, midway, above=2pt] {\texttt{task}} node[lbl, midway, below=2pt] {respuesta};
+  \draw[dflecha] (agente) -- (cerebro) node[lbl, midway, above=2pt] {prompt} node[lbl, midway, below=2pt] {Thought + Action};
+  \draw[dflecha] (agente) -- (herr) node[lbl, midway, right=2pt] {Action / Observation};
+  \draw[flecha]  (herr) -- (rag)   ;
+  \draw[flecha]  (rag)  -- (corpus);
+  \draw[flecha]  (herr.south) -- (cima.north) node[lbl, midway, right=2pt] {\texttt{search\_\allowbreak{}medication\_\allowbreak{}cima}};
+\end{tikzpicture}}
+\caption{Arquitectura del asistente. El agente (fase 4, sec.~\ref{sec:fase4}) pide al cerebro (fase 1, sec.~\ref{sec:fase1}) el siguiente paso, ejecuta las herramientas (fase 2, sec.~\ref{sec:fase2}) y recibe la observación. La base de conocimiento (fase 3, sec.~\ref{sec:fase3}) entra en el agente como una herramienta más.}
+\label{fig:arquitectura}
+\end{figure}
+
+\subsection*{Decisiones de diseño}
+
+\begin{itemize}
+  \item \textbf{Los cálculos los derivamos a una herramienta en lugar de dejar que el modelo los haga de cabeza.} De los cinco fallos analizados del modelo de razonamiento entrenado para la fase 1 (ver Sección~\ref{sec:fase1}), cuatro eran errores aritméticos. El modelo planteaba bien la operación a realizar, pero a la hora de dar el resultado lo devolvía mal. Por eso intentamos que el agente calcule con \texttt{dose\_\allowbreak{}calculator} (aritmética exacta) y \texttt{convert\_\allowbreak{}units} (para cambios de unidades dentro de una misma magnitud). Descartamos confiar en el modelo para dividir, porque es la operación en la que más falla el modelo, y además su aritmética no es trazable.
+
+  \item \textbf{Definimos cuatro herramientas (ver Sección~\ref{sec:fase2}).} Una que realiza una consulta externa (CIMA API~\cite{cima}) nos proporciona información sobre los medicamentos comercializados en España, según los datos oficiales de la AEMPS, dos que hacen cálculos matemáticos exactos (\texttt{dose\_\allowbreak{}calculator}, \texttt{convert\_\allowbreak{}units}) y una que realiza una acción (\texttt{create\_\allowbreak{}preparation\_\allowbreak{}sheet}), y genera un PDF que se guarda en local. Al principio planteamos usar otras fuentes de datos además de CIMA API, pero al final descartamos tanto PubChem~\cite{pubchem} como openFDA~\cite{openfda} porque esas dos contienen información de medicamentos comercializados en EE.\,UU. y no queríamos mezclar medicamentos de países diferentes. Además, como son de EE.\,UU., la información que devuelven está en inglés, mientras que la de CIMA API está en español y no queríamos confundir más al agente con tanto cambio de idioma.
+
+  \item \textbf{Las herramientas con efectos secundarios se bloquean} (Ver Sección~\ref{sec:fase4}). La herramienta \texttt{create\_\allowbreak{}preparation\_\allowbreak{}sheet}, marcada con \texttt{requires\_\allowbreak{}confirmation=True}, escribe un PDF y requiere confirmación del usuario para hacerle consciente de que está aceptando que un modelo escriba un archivo en su ordenador local, pero en \texttt{POST /agent} no hay nadie que confirme. Decidimos que el agente no la ejecute y que devuelva al modelo un error que este puede leer, para que use otra vía o explique lo que haría. Descartamos ejecutarla sin más porque no queremos que el usuario le dé permisos de escritura al agente sin ser consciente de ello.
+\end{itemize}

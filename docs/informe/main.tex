@@ -22,6 +22,10 @@
 \usepackage{subcaption}
 \usepackage{tabularx}
 
+% Diagramas
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric}
+
 % Código (para fragmentos en anexos)
 \usepackage{listings}
 \lstset{
@@ -55,6 +59,7 @@
       before skip=8pt, after skip=8pt]
     #3
   \end{tcolorbox}}
+
 
 % ====================== INFORMACIÓN DEL DOCUMENTO ===========================
 \newcommand{\Titulo}{
@@ -130,6 +135,10 @@
 \input{secciones/fase4_agente}
 \input{secciones/no_funciono}
 \input{secciones/diez_veces_computo}
+
+% ====================== REFERENCIAS ===========================
+\bibliographystyle{plain}
+\bibliography{ref}
 
 % ====================== ANEXOS ===========================
 \clearpage
