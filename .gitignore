@@ -27,6 +27,7 @@ hf_cache/
 
 # Resultados y gráficas grandes
 reports/*.png
+!phase1_pass1.png
 reports/*.csv
 
 # LaTeX (el .tex y el .pdf sí se versionan)
