@@ -36,6 +36,10 @@ reports/*.csv
 *.out
 *.toc
 *.synctex.gz
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
 
 # Herramientas
 .pytest_cache/

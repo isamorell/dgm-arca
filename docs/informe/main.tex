@@ -1,0 +1,126 @@
+\documentclass[11pt,a4paper]{article}
+
+% Idioma y codificación
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+
+% Formato de página
+\usepackage[a4paper, margin=2.5cm]{geometry}
+
+% Matemáticas
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{bm}
+
+% Figuras y tablas
+\usepackage{graphicx}
+\graphicspath{{figuras/}}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tabularx}
+
+% Código (para fragmentos en anexos)
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible
+}
+
+% Otros
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+% Enlaces (hyperref casi siempre al final)
+\usepackage[
+    hypertexnames=false,
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=blue
+]{hyperref}
+
+% ====================== INFORMACIÓN DEL DOCUMENTO ===========================
+\newcommand{\Titulo}{
+    Asistente de cálculo de medicación\\
+    para estudiantes de Enfermería
+}
+
+\newcommand{\Autores}{
+    Raquel Fernández Esquinas\\
+    Teresa X. Garvía Gallego\\
+    Isabel V. Morell Maudes
+}
+
+\newcommand{\Universidad}{
+    Universidad Pontificia Comillas\\
+    Escuela Técnica Superior de Ingeniería (ICAI)
+}
+
+\newcommand{\Asignatura}{
+    Modelos Generativos Profundos -- MUIA
+}
+
+\newcommand{\fecha}{
+    Noviembre, 2026
+}
+
+\hypersetup{
+    pdftitle={Asistente de cálculo de medicación para estudiantes de Enfermería},
+    pdfauthor={Fernández, Garvía, Morell}
+}
+
+\begin{document}
+
+% ====================== PORTADA ===========================
+\begin{titlepage}
+    \centering
+    \vspace*{1.5cm}
+    \includegraphics[width=0.3\textwidth]{logo.png}
+
+    \vspace{1.5cm}
+    {\Large \Universidad\par}
+
+    \vspace{2.5cm}
+    {\Huge \bfseries \Titulo\par}
+
+    \vspace{2cm}
+    {\large
+        \textbf{Autores}\\[0.4cm]
+        \Autores
+    }
+
+    \vfill
+    {\large
+        \textbf{\Asignatura}\\[0.3cm]
+        \fecha
+    }
+    \vspace{1cm}
+\end{titlepage}
+
+% ====================== ÍNDICE (página 2) ===========================
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+
+% ====================== SECCIONES ===========================
+\input{secciones/problema_usuario}
+\input{secciones/arquitectura}
+\input{secciones/fase1_razonamiento}
+\input{secciones/fase2_herramientas}
+\input{secciones/fase3_conocimiento}
+\input{secciones/fase4_agente}
+\input{secciones/no_funciono}
+\input{secciones/diez_veces_computo}
+
+% ====================== ANEXOS ===========================
+\clearpage
+\input{secciones/anexos}
+
+\end{document}
