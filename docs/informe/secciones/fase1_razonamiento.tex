@@ -1,7 +1,64 @@
 \section{Fase 1: razonamiento}
 \label{sec:fase1}
-% El dataset y el verificador: de dónde salen, cuántos problemas, qué decide el verificador y qué no.
-% La destilación: qué profesor, cuántas trazas, tasa de aceptación.
-% SFT y GRPO: hiperparámetros y por qué; las tres recompensas y por qué esa tercera.
-% Resultados: pass@1 base / SFT / GRPO; curvas de recompensa y longitud; cinco fallos analizados.
-% Qué aprendisteis del paso de GRPO a mano.
+\subsection{Dataset y verificador}
+El dataset de esta fase lo hemos generado de forma sintética con un script de Python. Hemos escrito a mano 26 plantillas de enunciado completas, que solo se usan en el estilo cohesivo, y un motor que compone el enunciado a partir de datos sueltos para los otros cuatro estilos (narrativo, telegráfico, lista y datos). Cada problema se redacta con uno de los cinco estilos, con el orden de los datos aleatorio y la pregunta siempre al final, y puede incluir un dato irrelevante (distractor, en el 35\,\% de los casos) para que el modelo tenga que decidir qué datos utiliza. Además, alternamos \texttt{,} y \texttt{.} como separador decimal y variamos las unidades (p.\,ej., \texttt{mcg} y \texttt{µg} representan lo mismo), ya que su uso depende de quien escribe. Así, 763 de los 800 problemas de train tienen un esqueleto distinto aunque partamos de solo 26 plantillas.
+
+Se han generado 1100 problemas: 800 de train, 200 de test (sin solapamiento con train) y 100 fuera de distribución (OOD). Se dividen en 7 familias: bomba, dilución, goteo, dosis por peso y día, volumen a administrar, infusión e infusión inversa. Las dos últimas, que son las de más pasos de razonamiento (4), se reservan para OOD, de modo que el modelo nunca las ve en el entrenamiento. La primera versión salía desequilibrada, con muchos más problemas de dosis por peso y día que del resto, así que fijamos cuotas por familia (160 en train y 40 en test por familia, y 50 en OOD).
+
+La respuesta de referencia la calcula la misma función que genera el problema, con \texttt{Fraction} y redondeo half-up, por lo que la etiqueta es exacta. El verificador extrae el contenido de \texttt{<answer>}, normaliza el número y lo compara con esa referencia (acepta cualquier valor que redondee al mismo número), y exige además la unidad que pide el enunciado: un valor correcto en la unidad equivocada (\texttt{mg} en vez de \texttt{µg}, \texttt{mL} en vez de \texttt{mL/h}) se da por malo. Decide, por tanto, si el resultado final es correcto y está bien expresado, pero no si el razonamiento que lleva a él lo es.
+
+\subsection{Destilación}
+Para que nuestro modelo (más pequeño) aprenda a razonar, usamos como profesor a Qwen3-4B con thinking activado y le pedimos 4 trazas por cada uno de los 800 problemas de train (3200 generaciones), con el muestreo de su \textit{model card} (temperatura 0,6, top-p 0,95, top-k 20) y un límite de 1200 tokens. Cada traza se reescribe al formato \texttt{<think>\dots</think><answer>\dots</answer>} y se acepta si el verificador da por buenos el valor y la unidad. El profesor tendía a razonar en inglés aunque el enunciado estuviera en español y pedírselo en el prompt no bastó, así que forzamos que empezara con <<Vale, voy a resolverlo paso a paso.>> y descartamos las trazas que no estuvieran mayoritariamente en español. Se aceptaron 3005 de las 3200 generaciones (93,9\,\%). De las 195 rechazadas, 164 son trazas que no terminaron en 1200 tokens (137 de ellas diluciones) y solo 31 son respuestas equivocadas, lo que indica que el dominio le resulta fácil al profesor. Para el SFT nos quedamos con las 2 trazas más cortas de cada problema: 1557 en total, de 570 tokens de media.
+
+\subsection{Supervised Fine-Tuning (SFT)}
+Con esas trazas entrenamos Qwen3-0.6B con un adaptador LoRA ($r=16$, $\alpha=32$, dropout 0,05, sobre todas las capas lineales). Como un arranque en frío enseña un formato y un estilo de razonamiento en español, y no conocimiento nuevo, un adaptador pequeño es suficiente. Usamos un learning rate de $2 \times 10^{-4}$, 3 épocas y un batch efectivo de 16, con la pérdida calculada solo sobre la respuesta del asistente. Reservamos el 5\,\% de los problemas para evaluación, elegidos por problema y no por traza para evitar fugas entre las dos trazas de un mismo problema. La pérdida de evaluación baja en las tres épocas (de 0,264 a 0,234) sin señal de sobreajuste, pero solo mide cuánto se parece el modelo al texto del profesor, no si acierta. No probamos otros hiperparámetros, así que los elegidos son razonables pero no óptimos.
+
+\subsection{Group Relative Policy Optimization (GRPO)}
+Definimos tres funciones de recompensa complementarias: la de formato, que comprueba que la respuesta sigue la estructura esperada e incluye las etiquetas de razonamiento; la de precisión, que evalúa si el valor final es correcto; y la de unidades, que comprueba que el modelo utilice la unidad adecuada y penaliza su uso incorrecto, aceptando todas sus formas equivalentes (p.\,ej., gotas/min y gotas por minuto). La elegimos por la importancia de las unidades en la administración de medicamentos: una misma cantidad en gramos, miligramos o kilogramos son órdenes de magnitud distintos y pueden causar errores graves de dosificación. En el primer entrenamiento esta recompensa fallaba en los ejercicios con gotas/min por una errata en la extracción de la unidad, así que la corregimos y repetimos los entrenamientos.
+
+Entrenamos tres modelos partiendo siempre del SFT y con un learning rate de $5 \times 10^{-6}$: GRPO (8 grupos), sin penalización KL y con 8 generaciones por problema; GRPO (KL), igual pero con penalización KL ($\beta = 0{,}04$); y GRPO (4 grupos), sin KL y con 4 generaciones por problema.
+
+\paragraph{GRPO a mano.}
+En nuestra implementación manual, la ventaja de cada respuesta es la diferencia entre su recompensa y la media de las respuestas generadas para el mismo problema, dividida por la desviación típica del grupo. Las respuestas por encima de la media reciben ventaja positiva y las que quedan por debajo, negativa, y actualizamos los parámetros para aumentar la probabilidad de las primeras. Para estabilizar el entrenamiento incorporamos un \textit{clipping} que limita el tamaño de las actualizaciones y una penalización KL opcional que controla cuánto se aleja la política de la de referencia.
+
+\subsection{Resultados}
+Realizamos múltiples experimentos. Los más relevantes se detallan aquí y el resto se encuentran en el Anexo \ref{anx:experiments}.
+
+La Figura~\ref{fig:grpo8} muestra el entrenamiento de GRPO sin KL y con 8 generaciones; las curvas completas de esta y de las otras dos configuraciones (Figuras~\ref{fig:grpo8full}, \ref{fig:grpokl} y~\ref{fig:grpo4}) están en el Anexo~\ref{anx:curvas} y siguen un patrón similar. La recompensa de precisión comienza por debajo de 0,5 y supera 0,8 en las primeras decenas de pasos, mientras que la longitud media de las respuestas baja de unos 600 a entre 300 y 400 tokens: a medida que el modelo aprende, necesita menos tokens para dar respuestas que cumplen los criterios. Con 4 generaciones en lugar de 8 las curvas son más ruidosas, lo que es coherente con una estimación menos estable de la ventaja.
+
+\begin{figure}[!tbp]
+    \centering
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\linewidth,trim=438bp 516bp 0bp 0bp,clip]{final_rlm_lora_sin_kl.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\linewidth,trim=438bp 262bp 0bp 262bp,clip]{final_rlm_lora_sin_kl.png}
+    \end{subfigure}
+    \caption{Entrenamiento con GRPO sin KL y con 8 generaciones por problema: recompensa de precisión (izquierda) y longitud media de las respuestas (derecha). La línea clara es el valor de cada paso y la naranja, su media móvil.}
+    \label{fig:grpo8}
+\end{figure}
+
+La Tabla~\ref{tab:test} compara el modelo base, el SFT y los tres modelos GRPO sobre el conjunto de test. Un problema cuenta en el Pass@1 solo si el valor y la unidad son correctos.
+
+El modelo base no responde en más de la mitad de los casos y solo respeta el formato en un 9,5\,\%, por lo que su Pass@1 es del 0\,\% aunque acierte el valor en un 26,5\,\%. Tras el SFT, el modelo aprende a usar las etiquetas y mejora su precisión. GRPO sin KL mejora además al SFT (89,5\,\% con 8 generaciones y 86,0\,\% con 4), mientras que GRPO con KL lo iguala y solo mejora el formato. Nuestra hipótesis es que la penalización mantiene al modelo demasiado cerca del SFT, que ya funcionaba bien, aunque no la hemos contrastado con otras semillas ni con otros valores de $\beta$. Utilizar 8 generaciones en lugar de 4 proporciona una estimación de la ventaja potencialmente más estable.
+
+\begin{table}[H]
+    \centering
+    \caption{Rendimiento sobre el conjunto de test (200 problemas): porcentaje de respuestas con el valor correcto, con el formato válido y sin respuesta, y Pass@1.}
+    \label{tab:test}
+    \begin{tabular}{lrrrr}
+        \toprule
+        Modelo & Valor correcto & Formato válido & Sin respuesta & Pass@1 \\
+        \midrule
+        Base             & 26,5\,\% & 9,5\,\%  & 53,5\,\% & 0,0\,\%  \\
+        SFT              & 80,5\,\% & 92,5\,\% & 7,5\,\%  & 80,5\,\% \\
+        GRPO (8 grupos)  & \textbf{89,5\,\%} & \textbf{97,0\,\%} & \textbf{3,0\,\%} & \textbf{89,5\,\%} \\
+        GRPO (KL)        & 80,5\,\% & 94,0\,\% & 6,0\,\%  & 80,5\,\% \\
+        GRPO (4 grupos)  & 86,0\,\% & 94,5\,\% & 5,5\,\%  & 86,0\,\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Generalización fuera de distribución.}
+Evaluamos el SFT y el mejor GRPO (sin KL, 8 generaciones) en los 100 problemas OOD de infusión e infusión inversa, todos de nivel 4. Ambos caen mucho: el SFT pasa de 80,5\,\% a 24,0\,\% y GRPO de 89,5\,\% a 30,0\,\%. Como los intervalos de confianza se solapan y la diferencia no es significativa ($p=0{,}307$, frente a $p=0{,}001$ en test), no podemos afirmar que GRPO generalice mejor que el SFT. Además, entre el 35\,\% y el 40\,\% de las respuestas no terminan en 1024 tokens, por lo que ``no sabe'' y ``no acaba'' quedan mezclados. Al revisar los casos con valor correcto y unidad incorrecta encontramos un fallo del verificador, que no reconocía \texttt{mcg/kg/min} y daba 20\,\% y 27\,\% en lugar de 24\,\% y 30\,\%. Lo corregimos y comprobamos que no cambiaba ningún veredicto en test.

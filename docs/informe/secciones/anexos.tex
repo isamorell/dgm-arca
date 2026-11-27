@@ -8,8 +8,35 @@
 
 \section{EXPERIMENTS.md}
 % Contenido completo de EXPERIMENTS.md.
+\label{anx:experiments}
 
-\section{Traza completa del ejemplo}\label{anx:traza}
+\section{Curvas de entrenamiento de GRPO}
+\label{anx:curvas}
+Curvas completas de las tres configuraciones de GRPO, comentadas en la sección~\ref{sec:fase1}. La Figura~\ref{fig:grpo8full} es la completa de la que se extraen los dos paneles de la Figura~\ref{fig:grpo8}, y la Figura~\ref{fig:grpokl} incluye además la divergencia KL con la política de referencia.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl.png}
+    \caption{GRPO sin penalización KL y 8 generaciones por problema.}
+    \label{fig:grpo8full}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_kl_04.png}
+    \caption{GRPO con penalización KL ($\beta = 0{,}04$) y 8 generaciones por problema.}
+    \label{fig:grpokl}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl_group_4.png}
+    \caption{GRPO sin penalización KL y 4 generaciones por problema.}
+    \label{fig:grpo4}
+\end{figure}
+
+\section{Traza completa del ejemplo}
+\label{anx:traza}
 Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seguida de la respuesta completa de \texttt{POST /agent} tal como la devuelve la API.
 
 \caja[orange!10]{Step 1}{\small
