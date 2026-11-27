@@ -1,3 +1,52 @@
-\section{Fase 3: conocimiento}
+\section{Fase 3: conocimiento (RAG)}
 \label{sec:fase3}
-% El corpus. La tabla de chunking. Recall@k y MRR por retriever y por chunking. Cómo elegisteis λ. Qué preguntas del conjunto dorado fallan y por qué. Cómo comprobáis las citas.
+\subsection{Corpus y conjunto dorado}
+El corpus se construye con las fichas técnicas de 47 medicamentos de CIMA (AEMPS), obtenidas mediante su API REST, que abarcan antibióticos y antiinfecciosos, analgésicos y antiinflamatorios, anticoagulantes y electrolitos. Guardamos un fichero Markdown por medicamento, con una sección \texttt{\#\#} por apartado de la ficha (composición, posología, reacciones adversas, etc.).
+
+Para evaluar la recuperación construimos un conjunto dorado de 50 preguntas, cada una con su evidencia textual en las fichas, de siete tipos (Anexo~\ref{anx:gold}). Medimos Recall@5 y MRR solo sobre las preguntas cuya evidencia cabe entera en algún chunk: 48 con el chunking recursivo y 47 con el semántico.
+
+\subsection{Chunking y retrievers}
+Comparamos dos chunkings que respetan la estructura del corpus. El recursivo divide por párrafos, luego por líneas y por frases hasta que cada trozo cabe en 800 caracteres (con solapamiento de 100). El semántico incrusta cada frase y abre un chunk donde la distancia coseno entre frases consecutivas supera un umbral. A los dos les aplicamos las mismas condiciones, para que la comparación sea justa: que ningún chunk cruce un encabezado de sección y que cada chunk empiece con su encabezado (MEDICAMENTO — 4.2 Posología), porque un trozo del medio de una sección no dice de qué fármaco habla y ni BM25 ni los embeddings pueden adivinarlo.
+
+El umbral del semántico no se podía elegir a ojo: con los valores de ejemplo de la plantilla (0,15 a 0,4) salía una frase por chunk, porque las distancias entre frases consecutivas de nuestras fichas son altas (mediana de 0,51). Barrimos umbrales de 0,5 a 0,9 y elegimos 0,75 (2406 chunks de 585 caracteres, cerca de los 556 del recursivo). No es el que mejores números da, pero a partir de 0,8 los cortes por tamaño superan a los semánticos (con 0,9 quedan 12 semánticos frente a más de 600 por tamaño), así que lo que se mide ya no es chunking semántico y la mejora se explica por tener chunks más grandes (barrido completo en el Anexo~\ref{anx:experiments}).
+
+Los tres retrievers devuelven el mismo objeto \texttt{Hit}, de modo que el resto del código no necesita saber cuál se usa. BM25 es la línea base léxica, con un tokenizador que quita acentos (los estudiantes escriben <<perfusion>> tanto como <<perfusión>>) y unifica la coma decimal (<<0,9\,\%>> de la ficha con <<0.9>> de la pregunta). El denso usa Qwen3-Embedding-0.6B, y el híbrido combina $\lambda \cdot \text{BM25} + (1-\lambda) \cdot \text{denso}$ con ambas puntuaciones reescaladas a $[0, 1]$. Como Qwen3-Embedding se preentrenó con una instrucción de tarea delante de la consulta, probamos seis variantes: la de por defecto, ninguna, dos de dominio (recuperar el fragmento de la ficha que responde a una pregunta de enfermería, en inglés y en español), una que pide identificar primero el fármaco y una de control sin relación con la tarea (clasificar el sentimiento de un texto). Quitarla casi no cambia nada (Recall@5 denso de 0,653 frente a 0,642, una pregunta de 48), las de dominio empeoran entre 5 y 7 puntos y una de control sin relación con la tarea hunde la recuperación a 0, lo que confirma que la instrucción entra en el vector. Dejamos la de por defecto.
+
+\subsection{Resultados}
+\begin{table}[H]
+    \centering
+    \caption{Recall@5 y MRR por chunking y retriever sobre el conjunto dorado. El híbrido usa el mejor $\lambda$ de cada chunking por MRR (0,4 en el recursivo y 0,3 en el semántico).}
+    \label{tab:rag}
+    \small
+    \begin{tabular}{lrrrr}
+        \toprule
+        Chunking & Chunks & BM25 & Denso & Híbrido \\
+        \midrule
+        Recursivo       & 2626 & 0,424 / 0,394 & 0,642 / 0,568 & \textbf{0,642 / 0,632} \\
+        Semántico (0,75) & 2406 & 0,475 / 0,417 & 0,578 / 0,603 & 0,583 / \textbf{0,647} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+El denso supera con diferencia a BM25 y los dos chunkings quedan casi empatados en MRR, así que nos quedamos con el recursivo, que tiene mejor recall y una pregunta menos sin resolver (Tabla~\ref{tab:rag}). Para el híbrido barrimos $\lambda$ de 0 a 1 en pasos de 0,1: añadir un poco de BM25 apenas cambia el Recall@5 pero sube el MRR de 0,568 a 0,632 en el recursivo, y a partir de $\lambda = 0{,}6$ el rendimiento cae rápido. Elegimos $\lambda = 0{,}4$ por MRR, porque el endpoint devuelve pocos fragmentos y lo importante es que el bueno salga primero.
+
+Con el híbrido fallan 13 de las 50 preguntas y en todas la ficha correcta está entre los cinco fragmentos recuperados: lo que falla es la sección. Fallan sobre todo las coloquiales y las de sección única (Tabla~\ref{tab:categorias}, Anexo~\ref{anx:gold}), en especial las de conservación, periodo de validez y envases, secciones cuyo texto es casi igual en las 47 fichas. En las coloquiales, una pregunta como <<¿cuánto me dura la vancomicina ya preparada?>> lleva a la ficha correcta pero no a la sección de periodo de validez, porque no usa el vocabulario de la ficha. Es nuestra explicación y no la hemos comprobado. Además, con el chunking recursivo hay 2 preguntas que no se pueden puntuar porque un corte cae en mitad de la evidencia y la reparte entre dos chunks, y 2 cuya evidencia es tan genérica que aparece en varias fichas, por lo que habría que alargarla.
+
+Para comprobar las citas, cada fragmento entra en el prompt con su identificador entre corchetes y \texttt{check\_citations} separa los identificadores de la respuesta en válidos (existen entre los fragmentos devueltos) e inválidos, que la API devuelve en \texttt{invalid\_citations}. Solo se mira el texto de la respuesta: si el razonamiento se trunca antes de cerrarse, se considera que no hay respuesta, para no contar como citas los identificadores que el modelo menciona mientras razona. Ningún modelo inventó identificadores (Tabla~\ref{tab:citas}), pero el 0,6B con nuestro adaptador cita solo en el 12\,\% de las preguntas, por lo que cambiaríamos el generador por uno de mayor tamaño. La comprobación tiene un límite: confirma que el identificador existe, pero no que la afirmación esté realmente en el fragmento citado, para lo cual haría falta un modelo juez.
+
+\begin{table}[H]
+    \centering
+    \caption{Citas de cada generador en las 48 preguntas del conjunto dorado cuya evidencia cabe en un chunk (1024 tokens de generación).}
+    \label{tab:citas}
+    \small
+    \begin{tabular}{lrrr}
+        \toprule
+        Generador & Cita algo & Cita el fragmento correcto & Ids inventados \\
+        \midrule
+        Qwen3-0.6B base               & 17 (35\,\%)   & 14 & 0 \\
+        Qwen3-0.6B + nuestro adaptador & 6 (12,5\,\%) & 5  & 0 \\
+        Qwen3-1.7B base               & 38 (79\,\%)   & 26 & 0 \\
+        Qwen3-4B base                 & 45 (94\,\%)   & 33 & 0 \\
+        \bottomrule
+    \end{tabular}
+\end{table}

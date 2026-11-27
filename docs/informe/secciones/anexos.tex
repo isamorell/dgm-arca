@@ -1,40 +1,5 @@
 \appendix
 
-\section{Repositorio y API}
-% Enlace al repositorio y URL de la API durante la correcci\'on.
-
-\section{Comandos de reproducci\'on}
-% Comandos para reproducir cada resultado.
-
-\section{EXPERIMENTS.md}
-% Contenido completo de EXPERIMENTS.md.
-\label{anx:experiments}
-
-\section{Curvas de entrenamiento de GRPO}
-\label{anx:curvas}
-Curvas completas de las tres configuraciones de GRPO, comentadas en la sección~\ref{sec:fase1}. La Figura~\ref{fig:grpo8full} es la completa de la que se extraen los dos paneles de la Figura~\ref{fig:grpo8}, y la Figura~\ref{fig:grpokl} incluye además la divergencia KL con la política de referencia.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl.png}
-    \caption{GRPO sin penalización KL y 8 generaciones por problema.}
-    \label{fig:grpo8full}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{final_rlm_lora_kl_04.png}
-    \caption{GRPO con penalización KL ($\beta = 0{,}04$) y 8 generaciones por problema.}
-    \label{fig:grpokl}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl_group_4.png}
-    \caption{GRPO sin penalización KL y 4 generaciones por problema.}
-    \label{fig:grpo4}
-\end{figure}
-
 \section{Traza completa del ejemplo}
 \label{anx:traza}
 Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seguida de la respuesta completa de \texttt{POST /agent} tal como la devuelve la API.
@@ -92,3 +57,63 @@ Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seg
     "tokens_used": 4512
 }
 \end{lstlisting}
+
+\section{EXPERIMENTS.md}
+% Contenido completo de EXPERIMENTS.md.
+\label{anx:experiments}
+
+\section{Curvas de entrenamiento de GRPO}
+\label{anx:curvas}
+Curvas completas de las tres configuraciones de GRPO, comentadas en la sección~\ref{sec:fase1}. La Figura~\ref{fig:grpo8full} es la completa de la que se extraen los dos paneles de la Figura~\ref{fig:grpo8}, y la Figura~\ref{fig:grpokl} incluye además la divergencia KL con la política de referencia.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl.png}
+    \caption{GRPO sin penalización KL y 8 generaciones por problema.}
+    \label{fig:grpo8full}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_kl_04.png}
+    \caption{GRPO con penalización KL ($\beta = 0{,}04$) y 8 generaciones por problema.}
+    \label{fig:grpokl}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{final_rlm_lora_sin_kl_group_4.png}
+    \caption{GRPO sin penalización KL y 4 generaciones por problema.}
+    \label{fig:grpo4}
+\end{figure}
+
+\section{Conjunto dorado RAG: tipos de pregunta}
+\label{anx:gold}
+Las 50 preguntas del conjunto dorado de la sección~\ref{sec:fase3} por tipo, con los resultados del híbrido y los fallos de cada tipo.
+
+\begin{table}[H]
+    \centering
+    \caption{Conjunto dorado por tipo de pregunta con el híbrido ($\lambda = 0{,}4$, chunking recursivo).}
+    \label{tab:categorias}
+    \small
+    \begin{tabular}{lrrr}
+        \toprule
+        Tipo de pregunta & Preguntas & Recall@5 / MRR & Fallos \\
+        \midrule
+        Un medicamento, una sección     & 15 & 0,571 / 0,524 & 6 \\
+        Un medicamento, varias secciones & 8 & 0,521 / 0,812 & 1 \\
+        Varios medicamentos             & 8 & 0,583 / 0,463 & 2 \\
+        Inversas (síntoma a fármaco)    & 8 & 1,000 / 1,000 & 0 \\
+        Lenguaje coloquial              & 5 & 0,250 / 0,250 & 3 \\
+        Premisa dudosa                  & 3 & 0,667 / 0,700 & 1 \\
+        Cálculo                         & 3 & 1,000 / 0,567 & 0 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\section{Repositorio y API}
+% Enlace al repositorio y URL de la API durante la correcci\'on.
+
+\section{Comandos de reproducci\'on}
+% Comandos para reproducir cada resultado.
