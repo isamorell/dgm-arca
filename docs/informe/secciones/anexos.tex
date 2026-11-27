@@ -58,10 +58,6 @@ Traza sin recortar del ejemplo de la sección~1 (cerebro \texttt{thinking}), seg
 }
 \end{lstlisting}
 
-\section{EXPERIMENTS.md}
-% Contenido completo de EXPERIMENTS.md.
-\label{anx:experiments}
-
 \section{Curvas de entrenamiento de GRPO}
 \label{anx:curvas}
 Curvas completas de las tres configuraciones de GRPO, comentadas en la sección~\ref{sec:fase1}. La Figura~\ref{fig:grpo8full} es la completa de la que se extraen los dos paneles de la Figura~\ref{fig:grpo8}, y la Figura~\ref{fig:grpokl} incluye además la divergencia KL con la política de referencia.
@@ -113,7 +109,106 @@ Las 50 preguntas del conjunto dorado de la sección~\ref{sec:fase3} por tipo, co
 
 
 \section{Repositorio y API}
-% Enlace al repositorio y URL de la API durante la corrección.
+\begin{itemize}
+    \item \textbf{Repositorio:} \url{https://github.com/isamorell/dgm-arca.git}
+    \item \textbf{API durante la corrección} (expuesta con \texttt{ngrok http 8000}):\\
+    \url{https://family-prodigy-gibberish.ngrok-free.dev}
+    \item \textbf{API en local:} \texttt{http://localhost:8000}, con la documentación de los endpoints en \texttt{/docs}.
+\end{itemize}
 
 \section{Comandos de reproducción}
-% Comandos para reproducir cada resultado.
+Los comandos están sacados de \texttt{EXPERIMENTS.md} (Anexo~\ref{anx:experiments}), donde se explica cada uno. Se ejecutan desde la raíz del repositorio. La API se arranca con \texttt{uv run uvicorn api.app:app --port 8000}.
+
+\subsection*{Fase 1: razonamiento}
+\begin{lstlisting}
+# Dataset (train, test sin solapamiento con train, y OOD)
+uv run python -m rlm.generate_problems --n 800 --split train --out rlm/data/train.jsonl
+uv run python -m rlm.generate_problems --n 200 --split test  --out rlm/data/test.jsonl --avoid rlm/data/train.jsonl
+uv run python -m rlm.generate_problems --n 100 --split ood   --out rlm/data/test_ood.jsonl
+
+# Destilación y SFT
+uv run python -m rlm.distill --data rlm/data/train.jsonl --samples 4 \
+  --batch-size 2 --max-new-tokens 1200 \
+  --raw-output outputs/distill/raw.jsonl --output rlm/data/sft_traces.jsonl
+uv run python -m rlm.train_sft --data rlm/data/sft_traces.jsonl --output rlm/weights/sft_lora
+
+# GRPO: sin KL, con KL (beta 0.04) y con 4 generaciones
+uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora
+uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --beta 0.04
+uv run python -m rlm.train_grpo --data rlm/data/train.jsonl --init-adapter rlm/weights/sft_lora --num-generations 4
+
+# Evaluación en test y análisis de los resultados
+uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters base=none sft=rlm/weights/sft_lora grpo_sin_kl=rlm/weights/final_rlm_lora_sin_kl grpo=rlm/weights/final_rlm_lora_04
+uv run python -m rlm.evaluate --data rlm/data/test.jsonl --adapters grpo_group_4=rlm/weights/final_rlm_lora_sin_kl_group_4
+uv run python -m rlm.analyze_eval
+
+# Curvas de entrenamiento (ejemplo: 4 generaciones)
+uv run python -m rlm.plot_curves rlm/weights/final_rlm_lora --output reports/rlm/final_rlm_lora_sin_kl_group_4/curves_grpo
+
+# Fuera de distribución
+uv run python -m rlm.evaluate --data rlm/data/test_ood.jsonl \
+  --adapters sft=rlm/weights/sft_lora grpo_sin_kl=rlm/weights/final_rlm_lora_sin_kl \
+  --out reports/phase1_eval_ood.json --history reports/phase1_pass1_ood.png
+uv run python -m rlm.compare_ood --rescore --models sft grpo_sin_kl
+\end{lstlisting}
+
+\subsection*{Fase 2: herramientas}
+\begin{lstlisting}
+uv run python -m pytest tests/test_tool_registry.py -v
+
+# Banco de herramientas: Qwen3-0.6B y Qwen3-1.7B
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-0.6B --out reports/phase2_eval_qwen3-0.6b.json
+uv run python -m tool_use.evaluate --model-id Qwen/Qwen3-1.7B --out reports/phase2_eval_qwen3-1.7b.json
+
+# Con nuestro modelo (GRPO sin KL y SFT)
+uv run python -m tool_use.evaluate --adapter rlm/weights/final_rlm_lora_sin_kl --thinking \
+  --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_grpo.json
+uv run python -m tool_use.evaluate --adapter raquelfes11/dgm-arca-sft-lora --thinking \
+  --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft.json
+
+# Descripciones sin ejemplos
+uv run python -m tool_use.evaluate --conditions tools \
+  --out reports/phase2_eval_qwen3-0.6b_desc.json
+uv run python -m tool_use.evaluate --conditions tools --adapter raquelfes11/dgm-arca-sft-lora \
+  --thinking --no-tools-prompt phase1 --out reports/phase2_eval_qwen3-0.6b_sft_desc.json
+\end{lstlisting}
+
+\subsection*{Fase 3: conocimiento}
+\begin{lstlisting}
+# Umbral del chunking semantico
+uv run python -m rag.chunking --doc ceftriaxona --sweep 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 --threshold 0.75 --out reports/rag/chunking_distances.png
+uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --thresholds 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 --out reports/phase3_threshold_sweep.json
+
+# Chunkings, retrievers y barrido de lambda
+uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --out reports/phase3_eval.json
+
+# Instruccion de la consulta en los embeddings
+uv run python -m rag.evaluate --gold rag/gold/gold.jsonl --k 5 --lam 0.4 --instruction-sweep
+
+# Citas de cuatro generadores
+ARCA_RLM_BASE_MODEL=Qwen/Qwen3-0.6B uv run python -m rag.compare_generators --tag qwen3-0.6b-base
+ARCA_RLM_BASE_MODEL=Qwen/Qwen3-0.6B ARCA_RLM_ADAPTER=rlm/weights/final_rlm_lora_sin_kl \
+  uv run python -m rag.compare_generators --tag qwen3-0.6b-rlm
+ARCA_RLM_BASE_MODEL=Qwen/Qwen3-1.7B uv run python -m rag.compare_generators --tag qwen3-1.7b
+ARCA_RLM_BASE_MODEL=Qwen/Qwen3-4B   uv run python -m rag.compare_generators --tag qwen3-4b
+\end{lstlisting}
+
+\subsection*{Fase 4: agente}
+\begin{lstlisting}
+uv run pytest tests/test_react_agent.py
+uv run python -m agent.measure_latency
+uv run python -m agent.measure_context_size
+uv run python -m agent.validate_bench
+
+# Evaluación de los tres cerebros en el banco de tareas
+export ARCA_RLM_ADAPTER=rlm/weights/final_rlm_lora_sin_kl
+export ARCA_RLM_ADAPTER_REPO=isamorell/dgm-arca-rlm-lora-sin-kl
+uv run python -m agent.evaluate --bench agent/bench/tasks.jsonl --brains base rlm thinking
+uv run python -m agent.analyze_eval --markdown reports/phase4_analysis.md
+\end{lstlisting}
+
+\section{EXPERIMENTS.md}
+\label{anx:experiments}
+Copia íntegra del cuaderno de experimentos \texttt{EXPERIMENTS.md} del repositorio.
+
+\input{secciones/experiments_md}

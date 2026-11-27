@@ -32,8 +32,43 @@
     basicstyle=\ttfamily\small,
     breaklines=true,
     frame=single,
-    columns=fullflexible
+    columns=fullflexible,
+    literate=%
+        {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+        {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+        {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {¿}{{\textquestiondown}}1
+        {·}{{\textperiodcentered}}1 {–}{{\textendash}}1 {—}{{\textemdash}}1
+        {…}{{\ldots}}1 {×}{{$\times$}}1 {÷}{{$\div$}}1 {µ}{{\textmu}}1
+        {μ}{{$\mu$}}1 {λ}{{$\lambda$}}1 {≈}{{$\approx$}}1 {→}{{$\to$}}1
+        {−}{{$-$}}1 {²}{{\texttwosuperior}}1 {³}{{\textthreesuperior}}1
+        {º}{{\textordmasculine}}1
 }
+
+% Caracteres Unicode usados en el texto (anexo EXPERIMENTS.md)
+\DeclareUnicodeCharacter{03BB}{\ensuremath{\lambda}}
+\DeclareUnicodeCharacter{03BC}{\ensuremath{\mu}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{2192}{\ensuremath{\to}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+
+% Tablas largas y utilidades que genera pandoc (anexo EXPERIMENTS.md)
+\usepackage{longtable, array, calc}
+\newcounter{none}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{%
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi%
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+\makeatother
+\setcounter{tocdepth}{2}
+\emergencystretch=3em
 
 % Otros
 \usepackage{xcolor}
